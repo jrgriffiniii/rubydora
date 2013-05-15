@@ -13,7 +13,7 @@ module Rubydora
     end
 
     def describe_repository_url options = nil
-      url_for("describe", options)
+      url_for("fcr:describe", options)
     end
 
     # Generate a base object REST API endpoint URI
