@@ -20,7 +20,7 @@ describe "Integration testing against a live Fedora repository", :integration =>
     @repository.ping.should == true
   end
 
-  it "should ingest from foxml" do
+  it "should create new objeccts" do
     @repository.find('changeme:n').delete rescue nil
     pid = @repository.ingest :pid => 'changeme:n'
 
@@ -30,7 +30,7 @@ describe "Integration testing against a live Fedora repository", :integration =>
     obj.should_not be_new
   end
 
-  it "should ingest from foxml" do
+  it "should create objects and mint pids" do
     pid = @repository.ingest :pid => 'new'
 
     obj = @repository.find(pid)
