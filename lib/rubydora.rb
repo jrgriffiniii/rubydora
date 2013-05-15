@@ -3,6 +3,7 @@ require 'active_model'
 require 'deprecation'
 
 module Rubydora
+  autoload :Graph, "rubydora/graph"
   autoload :Datastream, "rubydora/datastream"
   autoload :Repository, "rubydora/repository"
   autoload :ResourceIndex, "rubydora/resource_index"
