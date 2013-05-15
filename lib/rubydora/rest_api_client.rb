@@ -104,8 +104,7 @@ module Rubydora
     def object options = {}
       query_options = options.dup
       pid = query_options.delete(:pid)
-      query_options[:format] ||= 'xml'
-      client[object_url(pid, query_options)].get
+      client[object_url(pid, query_options)].get :accept => "application/n-triples"
     rescue Exception => exception
         rescue_with_handler(exception) || raise
     end
@@ -161,8 +160,9 @@ module Rubydora
     def modify_object options = {}
       query_options = options.dup
       pid = query_options.delete(:pid)
+      query = query_options.delete(:query)
       run_hook :before_modify_object, :pid => pid, :options => options
-      client[object_url(pid, query_options)].put nil
+      client[object_url(pid)].post query, :content_type => 'application/sparql-update'
     rescue Exception => exception
         rescue_with_handler(exception) || raise
     end
@@ -352,7 +352,7 @@ module Rubydora
     # @option options [String] :pid
     # @option options [String] :dsid
     # @return [String]
-    def modify_datastream options = {}
+    def modify_datastream_content options = {}
       query_options = options.dup
       pid = query_options.delete(:pid)
       dsid = query_options.delete(:dsid)
@@ -370,8 +370,23 @@ module Rubydora
       run_hook :before_modify_datastream, :pid => pid, :dsid => dsid, :file => file, :content_type => content_type, :options => options
       str = file.respond_to?(:read) ? file.read : file
       file.rewind if file.respond_to?(:rewind)
-      client[datastream_url(pid, dsid, query_options)].put(str, rest_client_options)
+      client[datastream_content_url(pid, dsid, query_options)].put(str, rest_client_options)
 
+    rescue Exception => exception
+        rescue_with_handler(exception) || raise
+    end
+
+    # {include:RestApiClient::API_DOCUMENTATION}
+    # @param [Hash] options
+    # @option options [String] :pid
+    # @return [String]
+    def modify_datastream options = {}
+      query_options = options.dup
+      pid = query_options.delete(:pid)
+      dsid = query_options.delete(:dsid)
+      query = query_options.delete(:query)
+      run_hook :before_modify_object, :pid => pid, :options => options
+      client[datastream_url(pid, dsid)].post query, :content_type => 'application/sparql-update'
     rescue Exception => exception
         rescue_with_handler(exception) || raise
     end

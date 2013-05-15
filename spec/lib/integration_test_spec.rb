@@ -12,8 +12,8 @@ describe "Integration testing against a live Fedora repository", :integration =>
   end
 
   after(:all) do
-    @repository.find('test:1').delete rescue nil
-    @repository.find('test:2').delete rescue nil
+  #  @repository.find('test:1').delete rescue nil
+  #  @repository.find('test:2').delete rescue nil
   end
 
   it "should connect" do
@@ -27,6 +27,7 @@ describe "Integration testing against a live Fedora repository", :integration =>
 
     obj = @repository.find(pid)
     obj.should_not be_new
+    @repository.find(pid).delete rescue nil
   end
 
   it "should create objects and mint pids" do
@@ -51,14 +52,14 @@ describe "Integration testing against a live Fedora repository", :integration =>
     obj.should_not be_new
   end
 
-  it "should have default datastreams" do
+  it "should not have default datastreams" do
     obj = @repository.find('test:1')
-    obj.datastreams.keys.should include("DC")
+    obj.datastreams.keys.should be_empty
   end
 
   it "should list object models" do
     obj = @repository.find('test:1')
-    obj.models.should include("info:fedora/fedora-system:FedoraObject-3.0")
+    obj.models.should include("fedora:resource")
   end
 
   it "should create another object" do
@@ -73,12 +74,12 @@ describe "Integration testing against a live Fedora repository", :integration =>
     obj.save
 
     obj = @repository.find('test:3')
-    obj.label.should == 'asdf'
+    obj.label.should == ['asdf']
     obj.label = 'qwerty'
     obj.save
 
     obj = @repository.find('test:3')
-    obj.label.should == 'qwerty'
+    obj.label.should == ['qwerty']
 
   end
 
@@ -154,8 +155,8 @@ describe "Integration testing against a live Fedora repository", :integration =>
 
     obj = @repository.find('test:1')
     obj.datastreams["my_ds"].content.should == "XXX"
-    obj.datastreams["my_ds"].dsLabel.should == "New Label"
-    obj.datastreams["my_ds"].mimeType.should == "application/x-text"
+    obj.datastreams["my_ds"].dsLabel.should include "New Label"
+    obj.datastreams["my_ds"].mimeType.should include "application/x-text"
   end
 
   it "should save IO-based datastreams" do
