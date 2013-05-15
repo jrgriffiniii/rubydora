@@ -25,6 +25,7 @@ Gem::Specification.new do |s|
   s.add_dependency "activemodel"
   s.add_dependency "hooks", "~> 0.3.0"
   s.add_dependency "deprecation"
+  s.add_dependency "rdf"
 
   s.add_development_dependency("rake")
   s.add_development_dependency("shoulda")

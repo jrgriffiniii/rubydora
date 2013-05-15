@@ -4,6 +4,7 @@ module Rubydora
   # and provides helper methods for creating and manipulating
   # them. 
   class Datastream
+    extend Deprecation
     extend ActiveModel::Callbacks
     define_model_callbacks :save, :create, :destroy
     define_model_callbacks :initialize, :only => :after
@@ -16,7 +17,24 @@ module Rubydora
     attr_reader :digital_object, :dsid
 
     # mapping datastream attributes (and api parameters) to datastream profile names
-    DS_ATTRIBUTES = {:controlGroup => :dsControlGroup, :dsLocation => :dsLocation, :altIDs => nil, :dsLabel => :dsLabel, :versionable => :dsVersionable, :dsState => :dsState, :formatURI => :dsFormatURI, :checksumType => :dsChecksumType, :checksum => :dsChecksum, :mimeType => :dsMIME, :logMessage => nil, :ignoreContent => nil, :lastModifiedDate => nil, :content => nil, :asOfDateTime => nil}
+    DS_ATTRIBUTES = {
+      :controlGroup => "info:fedora3/controlGroup",
+      :dsLocation => "info:fedora/fedora-system:def/internal#hasLocation", 
+      :altIDs => "http://purl.org/dc/terms/identifier", 
+      :dsLabel => "http://purl.org/dc/terms/title", 
+      :versionable => "info:fedora3/versionable", 
+      :dsState => "info:fedora3/state", 
+      :formatURI => "http://purl.org/dc/terms/format", 
+      :checksumType => "info:fedora3/checksumType", 
+      :checksum => "info:fedora3/checksum", 
+      :mimeType => "http://purl.org/dc/terms/type",
+      :logMessage => nil, 
+      :ignoreContent => nil, 
+      :lastModifiedDate => nil, 
+      :content => nil, 
+      :asOfDateTime => nil
+    }
+    
     DS_DEFAULT_ATTRIBUTES = { :controlGroup => 'M', :dsState => 'A', :versionable => true }
 
     define_attribute_methods DS_ATTRIBUTES.keys
@@ -115,6 +133,13 @@ module Rubydora
     def pid
       digital_object.pid
     end
+
+    ##
+    # Return a full uri pid (for use in relations, etc
+    def uri
+      digital_object.uri + "/" + dsid
+    end
+    alias_method :fqpid, :uri
 
     # Does this datastream already exist?
     # @return [Boolean]
@@ -249,64 +274,28 @@ module Rubydora
       end
     end
 
-    # Retrieve the datastream profile as a hash (and cache it)
-    # @param opts [Hash] :validateChecksum if you want fedora to validate the checksum
-    # @return [Hash] see Fedora #getDatastream documentation for keys
-    def profile opts= {}
-      if @profile && !(opts[:validateChecksum] && !@profile.has_key?('dsChecksumValid'))
-        ## Force a recheck of the profile if they've passed :validateChecksum and we don't have dsChecksumValid
-        return @profile
-      end
-      
-      return @profile = {} unless digital_object.respond_to? :repository
-      
-      @profile = begin
-        xml = profile_xml(opts)
+    # Retrieve the object profile as a hash (and cache it)
+    # @return [Hash] see Fedora #getObject documentation for keys
+    def profile
+      return {} if profile_data.nil?
 
-        (self.profile_xml_to_hash(xml) unless xml.blank?) || {}
-      end
+      @profile ||= begin
+        Rubydora::Graph.new self.uri, profile_data, DS_ATTRIBUTES
+      end.freeze
     end
 
-    def profile_xml opts = {}
-      @profile_xml = nil unless opts.empty?
-      
-      @profile_xml ||= begin
-
-        options = { :pid => pid, :dsid => dsid }
-        options.merge!(opts)
-        options[:asOfDateTime] = asOfDateTime if asOfDateTime
-        options[:validateChecksum] = true if repository.config[:validateChecksum]
-        repository.datastream(options)
-      rescue RestClient::Unauthorized => e
-        raise e
-      rescue RestClient::ResourceNotFound
-        # the datastream is new
-        ''
+    def profile_data
+      @profile_data ||= begin
+        repository.object(:pid => pid)
+      rescue RestClient::ResourceNotFound => e
+        
       end
     end
 
-    def profile= profile_xml
-      @profile = self.profile_xml_to_hash(profile_xml)
+    def profile_xml
+      profile_data
     end
-
-    def profile_xml_to_hash profile_xml
-      profile_xml.gsub! '<datastreamProfile', '<datastreamProfile xmlns="http://www.fedora.info/definitions/1/0/management/"' unless profile_xml =~ /xmlns=/
-      doc = Nokogiri::XML(profile_xml)
-      h = doc.xpath('/management:datastreamProfile/*', {'management' => "http://www.fedora.info/definitions/1/0/management/"} ).inject({}) do |sum, node|
-                   sum[node.name] ||= []
-                   sum[node.name] << node.text
-                   sum
-                 end.reject { |key, values| values.empty? }
-      h.select { |key, values| values.length == 1 }.each do |key, values|
-        h[key] = values.reject { |x| x.empty? }.first 
-      end
-
-      h['dsSize'] &&= h['dsSize'].to_i rescue h['dsSize']
-      h['dsCreateDate'] &&= Time.parse(h['dsCreateDate']) rescue h['dsCreateDate']
-      h['dsChecksumValid'] &&= h['dsChecksumValid'] == 'true' 
-      h['dsVersionable'] &&= h['dsVersionable'] == 'true' 
-      h
-    end
+    deprecation_deprecate :profile_xml
 
     def versions
       versions_xml = repository.datastream_versions(:pid => pid, :dsid => dsid)
@@ -342,7 +331,17 @@ module Rubydora
       run_callbacks :save do
         raise RubydoraError.new("Unable to save #{self.inspect} without content") unless has_content?
         return create if new?
-        repository.modify_datastream to_api_params.merge({ :pid => pid, :dsid => dsid })
+
+        query = serialize_changes_to_sparql_update
+
+        if content_changed?
+          repository.modify_datastream_content :pid => pid, :dsid => dsid, :content => content
+        end
+        
+        if query
+          repository.modify_datastream :pid => pid, :dsid => dsid, :query => query
+        end
+
         reset_profile_attributes
         self.class.new(digital_object, dsid, @options)
       end
@@ -387,27 +386,7 @@ module Rubydora
     
 
     protected
-    # datastream parameters 
-    # @return [Hash]
-    def to_api_params
-      h = default_api_params
-      valid_changed_attributes = changes.keys.map { |x| x.to_sym }.select { |x| DS_ATTRIBUTES.key? x }
-      valid_changed_attributes += [:content] if content_changed? and !valid_changed_attributes.include? :content
-      ## if we don't provide a mimeType, application/octet-stream will be used instead
-      (valid_changed_attributes | [:mimeType]).each do |attribute|
-        h[attribute.to_sym] = send(attribute) unless send(attribute).nil?
-      end
-
-      h
-    end
-
-    # default datastream parameters
-    # @return [Hash]
-    def default_api_params
-      return default_attributes.dup if new?
-      {}
-    end
-
+  
     # reset all profile attributes
     # @return [Hash]
     def reset_profile_attributes
@@ -446,6 +425,33 @@ module Rubydora
     def attribute_will_change! *args
       check_if_read_only
       super
+    end
+
+    def serialize_changes_to_sparql_update
+      deletes = []
+      inserts = []
+
+      return unless changed and !changes.empty?
+
+      changes.map do |k, (old_value, new_value)|
+        Array(old_value).each do |v|
+          deletes << "<#{uri}> <#{DS_ATTRIBUTES[k.to_sym].to_s}> \"#{RDF::NTriples::Writer.escape(v)}\" . " if v
+        end
+        Array(new_value).each do |v|
+          inserts << "<#{uri}> <#{DS_ATTRIBUTES[k.to_sym].to_s}> \"#{RDF::NTriples::Writer.escape(v)}\" . " if v
+        end
+      end
+
+      query = ""
+
+      query += "DELETE { #{deletes.join("\n")} }\n" unless deletes.empty?
+
+      query += "INSERT { #{inserts.join("\n")} }\n" unless inserts.empty?
+
+      query += "WHERE { }"
+
+      query
+
     end
   end
 end

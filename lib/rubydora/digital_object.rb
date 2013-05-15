@@ -1,3 +1,5 @@
+require 'rdf'
+
 module Rubydora
 
   # This class represents a Fedora object and provides
@@ -21,16 +23,22 @@ module Rubydora
     attr_reader :pid
     
     # mapping object parameters to profile elements
-    OBJ_ATTRIBUTES = {:state => :objState, :ownerId => :objOwnerId, :label => :objLabel, :logMessage => nil, :lastModifiedDate => :objLastModDate }
-
-    OBJ_DEFAULT_ATTRIBUTES = { }
+    OBJ_ATTRIBUTES = {
+      :state => "info:fedora3/state", 
+      :ownerId => "http://purl.org/dc/terms/creator", 
+      :label => "http://purl.org/dc/terms/title", 
+      :logMessage => nil, 
+      :lastModifiedDate => "info:fedora/fedora-system:def/internal#lastModified",
+      :datastreams => "info:fedora/fedora-system:def/internal#hasChild",
+      :models => "info:fedora/fedora-system:def/internal#mixinTypes"
+    }
 
     define_attribute_methods OBJ_ATTRIBUTES.keys
       
     OBJ_ATTRIBUTES.each do |attribute, profile_name|
       class_eval <<-RUBY
       def #{attribute.to_s}
-        @#{attribute} || profile['#{profile_name.to_s}'] || OBJ_DEFAULT_ATTRIBUTES[:#{attribute}]
+        @#{attribute} || profile["#{profile_name.to_s}"]
       end
 
       def #{attribute.to_s}= val
@@ -111,7 +119,7 @@ module Rubydora
     # Does this object already exist?
     # @return [Boolean]
     def new?
-      self.profile_xml.blank?
+      self.profile_data.blank?
     end
 
     def asOfDateTime asOfDateTime = nil
@@ -129,46 +137,29 @@ module Rubydora
     # Retrieve the object profile as a hash (and cache it)
     # @return [Hash] see Fedora #getObject documentation for keys
     def profile
-      return {} if profile_xml.nil?
+      return {} if profile_data.nil?
 
       @profile ||= begin
-        profile_xml.gsub! '<objectProfile', '<objectProfile xmlns="http://www.fedora.info/definitions/1/0/access/"' unless profile_xml =~ /xmlns=/
-        doc = Nokogiri::XML(profile_xml)
-        h = doc.xpath('/access:objectProfile/*', {'access' => "http://www.fedora.info/definitions/1/0/access/"} ).inject({}) do |sum, node|
-                     sum[node.name] ||= []
-                     sum[node.name] << node.text
-
-                     if node.name == "objModels"
-                       sum[node.name] = node.xpath('access:model', {'access' => "http://www.fedora.info/definitions/1/0/access/"}).map { |x| x.text }
-                     end
-
-                     sum
-                   end.reject { |key, values| values.empty? }
-
-        h.select { |key, values| values.length == 1 }.each do |key, values|
-          next if key == "objModels"
-          h[key] = values.reject { |x| x.empty? }.first
-        end
-        @new = false
-
-        h
-      
+        Rubydora::Graph.new self.uri, profile_data, OBJ_ATTRIBUTES
       end.freeze
     end
 
-    def profile_xml
-      @profile_xml ||= begin
-        options = { :pid => pid }
-        options[:asOfDateTime] = asOfDateTime if asOfDateTime
-        repository.object(options)
+    def profile_data
+      @profile_data ||= begin
+        repository.object(:pid => pid)
       rescue RestClient::ResourceNotFound => e
-        ''
+        
       end
     end
 
     def object_xml
       repository.object_xml(pid: pid)
     end
+
+    def profile_xml
+      profile_data
+    end
+    deprecation_deprecate :profile_xml
 
     def versions
       versions_xml = repository.object_versions(:pid => pid)
@@ -184,19 +175,13 @@ module Rubydora
     # @return [Array<Rubydora::Datastream>] 
     def datastreams
       @datastreams ||= begin
-        h = Hash.new { |h,k| h[k] = datastream_object_for(k) }                
+        h = Hash.new { |h,k| h[k] = datastream_object_for(k) } 
 
-        begin
-          options = { :pid => pid }
-          options[:asOfDateTime] = asOfDateTime if asOfDateTime
-          datastreams_xml = repository.datastreams(options)
-          datastreams_xml.gsub! '<objectDatastreams', '<objectDatastreams xmlns="http://www.fedora.info/definitions/1/0/access/"' unless datastreams_xml =~ /xmlns=/
-          doc = Nokogiri::XML(datastreams_xml)
-          doc.xpath('//access:datastream', {'access' => "http://www.fedora.info/definitions/1/0/access/"}).each do |ds| 
-            h[ds['dsid']] = datastream_object_for ds['dsid'] 
-          end
-        rescue RestClient::ResourceNotFound
-        end
+        Array(profile[:datastreams]).map do |datastream|
+          # TODO : this is completely wrong! 
+          dsid = datastream.split("/").last
+          h[dsid] = datastream_object_for dsid 
+        end               
 
         h
       end
@@ -219,13 +204,15 @@ module Rubydora
     def save
       check_if_read_only
       run_callbacks :save do
+        query = serialize_changes_to_sparql_update
+        
         if self.new?
-          self.pid = repository.ingest to_api_params.merge(:pid => pid)
+          self.pid = repository.ingest :pid => pid
+          repository.modify_object :pid => pid, :query => query if query
           @profile = nil #will cause a reload with updated data
           @profile_xml = nil
         else                       
-          p = to_api_params
-          repository.modify_object p.merge(:pid => pid) unless p.empty?
+          repository.modify_object :pid => pid, :query => query if query
         end
       end
 
@@ -243,6 +230,7 @@ module Rubydora
         @profile = nil
         @profile_xml = nil
         @pid = nil
+        @graph = nil
         nil
       end
       repository.purge_object(:pid => my_pid) ##This can have a meaningful exception, don't put it in the callback
@@ -262,21 +250,31 @@ module Rubydora
       @pid = pid.gsub('info:fedora/', '') if pid
     end
 
-    # datastream parameters 
-    # @return [Hash]
-    def to_api_params
-      h = default_api_params
-      changes.keys.select { |x| OBJ_ATTRIBUTES.key? x.to_sym }.each do |attribute|
-        h[attribute.to_sym] = send(attribute) unless send(attribute).nil?
+    def serialize_changes_to_sparql_update
+      deletes = []
+      inserts = []
+
+      return unless changed and !changes.empty?
+
+      changes.map do |k, (old_value, new_value)|
+        Array(old_value).each do |v|
+          deletes << "<#{uri}> <#{OBJ_ATTRIBUTES[k.to_sym].to_s}> \"#{RDF::NTriples::Writer.escape(v)}\" . " if v
+        end
+        Array(new_value).each do |v|
+          inserts << "<#{uri}> <#{OBJ_ATTRIBUTES[k.to_sym].to_s}> \"#{RDF::NTriples::Writer.escape(v)}\" . " if v
+        end
       end
 
-      h
-    end
+      query = ""
 
-    # default datastream parameters
-    # @return [Hash]
-    def default_api_params
-      OBJ_DEFAULT_ATTRIBUTES.dup
+      query += "DELETE { #{deletes.join("\n")} }\n" unless deletes.empty?
+
+      query += "INSERT { #{inserts.join("\n")} }\n" unless inserts.empty?
+
+      query += "WHERE { }"
+
+      query
+
     end
 
     # instantiate a datastream object for a dsid
