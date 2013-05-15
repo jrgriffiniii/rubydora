@@ -11,6 +11,11 @@ describe "Integration testing against a live Fedora repository", :integration =>
     @repository.find('test:3').delete rescue nil
   end
 
+  after(:all) do
+    @repository.find('test:1').delete rescue nil
+    @repository.find('test:2').delete rescue nil
+  end
+
   it "should connect" do
     @repository.ping.should == true
   end
@@ -441,9 +446,4 @@ describe "Integration testing against a live Fedora repository", :integration =>
       obj.datastreams["my_ds"].content.should == "XXX"
   end
 
-
-  after(:all) do
-    @repository.find('test:1').delete rescue nil
-    @repository.find('test:2').delete rescue nil
-  end
 end
