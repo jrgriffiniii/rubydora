@@ -20,12 +20,12 @@ module Rubydora
     # @param [String] pid
     # @param [Hash] options to convert to URL parameters
     # @return [String] URI
-    def object_url pid, options = nil
-      url_for("objects" + (("/#{CGI::escape(pid.to_s.gsub('info:fedora/', ''))}" if pid) || ''), options)
+    def object_url path, options = nil
+      url_for("#{CGI::escape(path.to_s.gsub('info:fedora', ''))}", options)
     end
 
     def new_object_url options = nil
-      object_url "new", options
+      url_for "objects/fcr:new", options
     end
 
     # @param [Hash] options to convert to URL parameters

@@ -118,7 +118,7 @@ module Rubydora
       query_options = options.dup
       pid = query_options.delete(:pid)
 
-      if pid.nil?
+      if pid.nil? || pid == "new"
         return mint_pid_and_ingest options
       end
 

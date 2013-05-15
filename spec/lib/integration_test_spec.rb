@@ -20,11 +20,10 @@ describe "Integration testing against a live Fedora repository", :integration =>
     @repository.ping.should == true
   end
 
-  it "should create new objeccts" do
-    @repository.find('changeme:n').delete rescue nil
-    pid = @repository.ingest :pid => 'changeme:n'
+  it "should create new objects with a given pid" do
+    pid = @repository.ingest :pid => 'test:1'
 
-    pid.should == 'changeme:n'
+    pid.should == '/test:1'
 
     obj = @repository.find(pid)
     obj.should_not be_new
