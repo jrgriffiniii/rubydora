@@ -137,7 +137,7 @@ module Rubydora
     # Retrieve the object profile as a hash (and cache it)
     # @return [Hash] see Fedora #getObject documentation for keys
     def profile
-      return {} if profile_data.nil?
+      return {} if profile_data.empty?
 
       @profile ||= begin
         Rubydora::Graph.new self.uri, profile_data, OBJ_ATTRIBUTES
@@ -148,7 +148,7 @@ module Rubydora
       @profile_data ||= begin
         repository.object(:pid => pid)
       rescue RestClient::ResourceNotFound => e
-        
+        ""
       end
     end
 
@@ -210,13 +210,13 @@ module Rubydora
           self.pid = repository.ingest :pid => pid
           repository.modify_object :pid => pid, :query => query if query
           @profile = nil #will cause a reload with updated data
-          @profile_xml = nil
+          @profile_data = nil
         else                       
           repository.modify_object :pid => pid, :query => query if query
         end
       end
 
-      self.datastreams.select { |dsid, ds| ds.changed? }.each { |dsid, ds| ds.save }
+      self.datastreams.select { |dsid, ds| ds.needs_to_be_saved? }.each { |dsid, ds| ds.save }
       self
     end
 

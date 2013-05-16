@@ -19,7 +19,7 @@ module Rubydora
     # mapping datastream attributes (and api parameters) to datastream profile names
     DS_ATTRIBUTES = {
       :controlGroup => "info:fedora3/controlGroup",
-      :dsLocation => "info:fedora/fedora-system:def/internal#hasLocation", 
+      :dsLocation => "info:fedora3/dsLocation", 
       :altIDs => "http://purl.org/dc/terms/identifier", 
       :dsLabel => "http://purl.org/dc/terms/title", 
       :versionable => "info:fedora3/versionable", 
@@ -61,22 +61,21 @@ module Rubydora
       }
     end
 
-    DS_READONLY_ATTRIBUTES = [ :dsCreateDate , :dsSize, :dsVersionID ]
-    DS_READONLY_ATTRIBUTES.each do |attribute|
-      class_eval %Q{
-      def #{attribute.to_s}
-        @#{attribute} || profile['#{attribute.to_s}'] || default_attributes[:#{attribute}]
-      end
-      }
-
-      def dsChecksumValid
-        profile(:validateChecksum=>true)['dsChecksumValid']
-      end
+    def dsChecksumValid
+      profile(:validateChecksum=>true)['dsChecksumValid']
     end
 
+    def dsCreateDate
+      Time.parse(profile["info:fedora/fedora-system:def/internal#created"].first)
+    end
+    alias_method :createDate, :dsCreateDate
+
+    def size
+      profile.with_content_subject["info:fedora/size"].first.to_i
+    end
 
     # Create humanized accessors for the DS attribute  (dsState -> state, dsCreateDate -> createDate)
-    (DS_ATTRIBUTES.keys + DS_READONLY_ATTRIBUTES).select { |k| k.to_s =~ /^ds/ }.each do |attribute|
+    (DS_ATTRIBUTES.keys).select { |k| k.to_s =~ /^ds/ }.each do |attribute|
       simple_attribute = attribute.to_s.sub(/^ds/, '')
       simple_attribute = simple_attribute[0].chr.downcase + simple_attribute[1..-1]
 
@@ -277,7 +276,7 @@ module Rubydora
     # Retrieve the object profile as a hash (and cache it)
     # @return [Hash] see Fedora #getObject documentation for keys
     def profile
-      return {} if profile_data.nil?
+      return {} if profile_data.empty?
 
       @profile ||= begin
         Rubydora::Graph.new self.uri, profile_data, DS_ATTRIBUTES
@@ -286,9 +285,9 @@ module Rubydora
 
     def profile_data
       @profile_data ||= begin
-        repository.object(:pid => pid)
+        repository.datastream(:pid => pid, :dsid => dsid)
       rescue RestClient::ResourceNotFound => e
-        
+        ""
       end
     end
 
@@ -316,12 +315,7 @@ module Rubydora
     # Add datastream to Fedora
     # @return [Rubydora::Datastream]
     def create
-      check_if_read_only
-      run_callbacks :create do
-        repository.add_datastream to_api_params.merge({ :pid => pid, :dsid => dsid, :content => content })
-        reset_profile_attributes
-        self.class.new(digital_object, dsid, @options)
-      end
+      save if new?
     end
 
     # Modify or save the datastream
@@ -330,12 +324,17 @@ module Rubydora
       check_if_read_only
       run_callbacks :save do
         raise RubydoraError.new("Unable to save #{self.inspect} without content") unless has_content?
-        return create if new?
+        
+        if new?
+          run_callbacks :create 
+        end
 
         query = serialize_changes_to_sparql_update
 
         if content_changed?
           repository.modify_datastream_content :pid => pid, :dsid => dsid, :content => content
+        elsif external? || redirect?
+          repository.modify_datastream_content :pid => pid, :dsid => dsid, :content => dsLocation
         end
         
         if query
@@ -383,6 +382,10 @@ module Rubydora
       controlGroup == 'X'
     end
 
+    def needs_to_be_saved?
+      changed?
+    end
+
     
 
     protected
@@ -391,7 +394,7 @@ module Rubydora
     # @return [Hash]
     def reset_profile_attributes
       @profile = nil
-      @profile_xml = nil
+      @profile_data = nil
       @datastream_content = nil
       @content = nil
       @changed_attributes = {}

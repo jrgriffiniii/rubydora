@@ -156,11 +156,11 @@ module Rubydora
 
             when :modify_datastream
               repository.purge_object :pid => options[:pid] rescue nil
-              repository.ingest :pid => options[:pid], :file => options[:foxml]
+              repository.import :pid => options[:pid], :file => options[:foxml]
 
             when :purge_datastream
               repository.purge_object :pid => options[:pid] rescue nil
-              repository.ingest :pid => options[:pid], :file => options[:foxml]
+              repository.import :pid => options[:pid], :file => options[:foxml]
           end
         rescue
           # no-op

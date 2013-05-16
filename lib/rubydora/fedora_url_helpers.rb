@@ -98,21 +98,28 @@ module Rubydora
     # @param [Hash] options to convert to URL parameters
     # @return [String] URI
     def export_object_url pid, options = nil
-      url_for(object_url(pid) + "/export", options)
+      url_for(object_url(pid) + "/fcr:export", options)
+    end
+
+    # @param [String] pid
+    # @param [Hash] options to convert to URL parameters
+    # @return [String] URI
+    def import_object_url pid, options = nil
+      url_for("/fcr:import", options)
     end
 
     # @param [String] pid
     # @param [Hash] options to convert to URL parameters
     # @return [String] URI
     def object_versions_url pid, options = nil
-      url_for(object_url(pid) + "/versions", options)
+      url_for(object_url(pid) + "/fcr:versions", options)
     end
 
     # @param [String] pid
     # @param [Hash] options to convert to URL parameters
     # @return [String] URI
     def object_xml_url pid, options = nil
-      url_for(object_url(pid) + "/objectXML", options)
+      url_for(object_url(pid) + "/fcr:export", options)
     end
 
     # @param [String] pid

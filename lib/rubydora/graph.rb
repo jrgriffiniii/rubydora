@@ -12,12 +12,24 @@ module Rubydora
 
       @mapping = mapping
 	    
-      data = StringIO.new(content)
-      RDF::Reader.for(:ntriples).new(data) do |reader|
-	      reader.each_statement do |statement|
-	        rdf << statement
-	      end
-	    end
+      if content.is_a? RDF::Graph
+        @rdf = content
+      else
+        data = StringIO.new(content)
+        RDF::Reader.for(:ntriples).new(data) do |reader|
+  	      reader.each_statement do |statement|
+  	        rdf << statement
+  	      end
+  	    end
+      end
+    end
+
+    def with_subject new_subject
+      Rubydora::Graph.new new_subject, rdf, mapping
+    end
+
+    def with_content_subject
+      with_subject(subject.to_s + "/fcr:content")
     end
 
     def find term, &block

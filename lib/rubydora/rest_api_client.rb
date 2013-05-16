@@ -157,6 +157,20 @@ module Rubydora
     # @param [Hash] options
     # @option options [String] :pid
     # @return [String]
+    def import options = {}
+      query_options = options.dup
+      pid = query_options.delete(:pid)
+      file = query_options.delete(:file)
+  #    raise ArgumentError, "Must have a pid" unless pid
+      client[import_object_url("objects", query_options)].post file
+    rescue Exception => exception
+        rescue_with_handler(exception) || raise
+    end
+
+    # {include:RestApiClient::API_DOCUMENTATION}
+    # @param [Hash] options
+    # @option options [String] :pid
+    # @return [String]
     def modify_object options = {}
       query_options = options.dup
       pid = query_options.delete(:pid)
@@ -221,15 +235,10 @@ module Rubydora
       dsid = query_options.delete(:dsid)
       raise ArgumentError, "Missing required parameter :pid" unless pid
 
-      if dsid.nil?
-        #raise ArgumentError, "Missing required parameter :dsid" unless dsid
-        Deprecation.warn(RestApiClient, "Calling Rubydora::RestApiClient#datastream without a :dsid is deprecated, use #datastreams instead")
-        return datastreams(options)
-      end
       query_options[:format] ||= 'xml'
       val = nil
       benchmark "Loaded datastream profile #{pid}/#{dsid}", :level=>:debug do
-        val = client[datastream_url(pid, dsid, query_options)].get
+        val = client[datastream_url(pid, dsid, query_options)].get :accept => "application/n-triples"
       end
 
       val
@@ -342,7 +351,7 @@ module Rubydora
       run_hook :before_add_datastream, :pid => pid, :dsid => dsid, :file => file, :options => options
       str = file.respond_to?(:read) ? file.read : file
       file.rewind if file.respond_to?(:rewind)
-      client[datastream_url(pid, dsid, query_options)].post(str, :content_type => content_type.to_s, :multipart => true)
+      client[datastream_content_url(pid, dsid, query_options)].post(str, :content_type => content_type.to_s, :multipart => true)
     rescue Exception => exception
         rescue_with_handler(exception) || raise
     end

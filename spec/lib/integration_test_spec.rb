@@ -100,7 +100,11 @@ describe "Integration testing against a live Fedora repository", :integration =>
     ds = obj.datastreams["Redirect"]
     ds.controlGroup = "R"
     ds.dsLocation = "http://example.org"
-    ds.save
+    obj.save
+
+    obj = @repository.find_or_initialize('test:1')
+    obj.datastreams.keys.should include("Redirect")
+    obj.datastreams["Redirect"].controlGroup.should include "R"
   end
 
   it "should have datastreams" do
@@ -118,19 +122,20 @@ describe "Integration testing against a live Fedora repository", :integration =>
     obj = @repository.find_or_initialize('test:1')
     ds = obj.datastreams["Test"]
 
-    ds.versionID.should == "Test.0"
+    #ds.versionID.should == "Test.0"
 
     (Time.now - ds.createDate).should be < 60*60 # 1 hour
-    ds.state.should == "A"
-    ds.controlGroup.should == "M"
+    #ds.state.should == "A"
+    #ds.controlGroup.should == "M"
     ds.size.should be > 100
-  end
   end
 
   it "should delete datastreams" do
     obj = @repository.find_or_initialize('test:1')
     ds = obj.datastreams["Test"].delete
     obj.datastreams.keys.should_not include("Test")
+  end
+
   end
 
   it "should save changed datastreams when the object is saved" do
@@ -171,22 +176,22 @@ describe "Integration testing against a live Fedora repository", :integration =>
 
   describe "with transactions" do
     it "should work on ingest" do
-       @repository.find('transactions:1').delete rescue nil
+       @repository.find('test:transactionobject').delete rescue nil
 
        @repository.transaction do |t|
-         obj = @repository.find_or_initialize('transactions:1')
+         obj = @repository.find_or_initialize('test:transactionobject')
          obj.save
 
          t.rollback
        end
 
-       lambda { @repository.find('transactions:1') }.should raise_error Rubydora::RecordNotFound
+       lambda { @repository.find('test:transactionobject') }.should raise_error Rubydora::RecordNotFound
     end
 
     it "should work on purge" do
-       @repository.find('transactions:1').delete rescue nil
+       @repository.find('test:transactionobject').delete rescue nil
 
-       obj = @repository.find_or_initialize('transactions:1')
+       obj = @repository.find_or_initialize('test:transactionobject')
        obj.save
 
        @repository.transaction do |t|
@@ -195,13 +200,13 @@ describe "Integration testing against a live Fedora repository", :integration =>
          t.rollback
        end
 
-       obj = @repository.find('transactions:1')
+       obj = @repository.find('test:transactionobject')
        obj.should_not be_new
     end
 
     it "should work on datastreams" do
-       @repository.find('transactions:1').delete rescue nil
-       obj = Rubydora::DigitalObject.new('transactions:1', @repository)
+       @repository.find('test:transactionobject').delete rescue nil
+       obj = Rubydora::DigitalObject.new('test:transactionobject', @repository)
        obj.save
 
        ds = obj.datastreams['datastream_to_delete']
@@ -224,8 +229,8 @@ describe "Integration testing against a live Fedora repository", :integration =>
          ds2.content = '1234'
          ds2.save
 
-         @repository.set_datastream_options :pid => obj.pid, :dsid => 'datastream_to_change_properties', :state => 'A'
-         @repository.set_datastream_options :pid => obj.pid, :dsid => 'datastream_to_change_properties', :versionable => false
+       #  @repository.set_datastream_options :pid => obj.pid, :dsid => 'datastream_to_change_properties', :state => 'A'
+       #  @repository.set_datastream_options :pid => obj.pid, :dsid => 'datastream_to_change_properties', :versionable => false
 
          ds4 = obj.datastreams['datastream_to_create']
          ds4.content = 'asdf'
@@ -234,19 +239,19 @@ describe "Integration testing against a live Fedora repository", :integration =>
          t.rollback
        end
 
-       obj = @repository.find('transactions:1')
+       obj = @repository.find('test:transactionobject')
        obj.datastreams.keys.should_not include('datsatream_to_create')
        obj.datastreams.keys.should include('datastream_to_delete')
        obj.datastreams['datastream_to_change'].content.should == 'asdf'
        obj.datastreams['datastream_to_change_properties'].versionable.should == true
-       obj.datastreams['datastream_to_change_properties'].dsState.should == 'I'
+       obj.datastreams['datastream_to_change_properties'].dsState.should include 'I'
     end
 
     it "should work on relationships" do
       pending("fcrepo 3.6's relationship api is busted; skipping") if @repository.version == 3.6
-       @repository.find('transactions:1').delete rescue nil
+       @repository.find('test:transactionobject').delete rescue nil
 
-      obj = @repository.find_or_initialize('transactions:1')
+      obj = @repository.find_or_initialize('test:transactionobject')
        obj.save
        @repository.add_relationship :subject => obj.pid, :predicate => 'uri:asdf', :object => 'fedora:object'
 
@@ -259,18 +264,20 @@ describe "Integration testing against a live Fedora repository", :integration =>
          t.rollback
 
        end
-       obj = @repository.find('transactions:1')
+       obj = @repository.find('test:transactionobject')
        obj.datastreams['RELS-EXT'].content.should == ds
     end
   end
 
   describe "object versions" do
     it "should have versions" do
+      pending "no versions in fcrepo4 yet"
       obj = @repository.find('test:1')
       obj.versions.should_not be_empty
     end
 
     it "should have read-only versions" do
+      pending "no versions in fcrepo4 yet"
       obj = @repository.find_or_initialize('test:1')
       expect { obj.versions.first.label = "asdf" }.to raise_error
     end
@@ -290,6 +297,8 @@ describe "Integration testing against a live Fedora repository", :integration =>
     #end
 
     it "should access datastreams list using asOfDateTime (and pass the asOfDateTime through to the datastreams)" do
+    
+      pending "no versions in fcrepo4 yet"
       obj = @repository.find_or_initialize('test:1')
       oldest = obj.versions.first.datastreams.keys
       newest = obj.versions.last.datastreams.keys
@@ -302,6 +311,7 @@ describe "Integration testing against a live Fedora repository", :integration =>
   describe "datastream versions" do
 
     it "should have versions" do
+      pending "no versions in fcrepo4 yet"
       obj = @repository.find_or_initialize('test:1')
       versions = obj.datastreams["my_ds"].versions
       versions.should_not be_empty
@@ -309,6 +319,7 @@ describe "Integration testing against a live Fedora repository", :integration =>
     end
 
     it "should have read-only versions" do
+      pending "no versions in fcrepo4 yet"
       obj = @repository.find_or_initialize('test:1')
       ds = obj.datastreams["my_ds"].asOfDateTime(Time.now)
       expect { ds.dsLabel = 'asdf' }.to raise_error
@@ -316,6 +327,7 @@ describe "Integration testing against a live Fedora repository", :integration =>
     end
 
     it "should access the content of older datastreams" do
+      pending "no versions in fcrepo4 yet"
       obj = @repository.find_or_initialize('test:1')
 
       ds = obj.datastreams["my_ds"]
@@ -327,6 +339,7 @@ describe "Integration testing against a live Fedora repository", :integration =>
     end
 
     it "should allow the user to go from a versioned datastream to an unversioned datastream" do
+      pending "no versions in fcrepo4 yet"
       obj = @repository.find_or_initialize('test:1')
       versions_count = obj.datastreams["my_ds"].versions.length
 
@@ -355,6 +368,7 @@ describe "Integration testing against a live Fedora repository", :integration =>
     end
 
     it "should default to application/octet-stream" do
+      pending("fcrepo4 doesn't claiming any default")
       obj = @repository.find_or_initialize('test:1')
       obj.datastreams["my_ds"].content = "XXX"
       obj.save
@@ -370,7 +384,7 @@ describe "Integration testing against a live Fedora repository", :integration =>
       obj.save
 
       obj = @repository.find('test:1')
-      obj.datastreams["my_ds"].mimeType.should == "text/plain"
+      obj.datastreams["my_ds"].mimeType.should include "text/plain"
     end
 
     it "should preserve the mimetype on update" do
@@ -384,7 +398,7 @@ describe "Integration testing against a live Fedora repository", :integration =>
       obj.save
 
       obj = @repository.find('test:1')
-      obj.datastreams["my_ds"].mimeType.should == "text/plain"
+      obj.datastreams["my_ds"].mimeType.should include "text/plain"
     end
 
     it "should allow the mimetype to be changed" do
@@ -398,7 +412,7 @@ describe "Integration testing against a live Fedora repository", :integration =>
       obj.save
 
       obj = @repository.find('test:1')
-      obj.datastreams["my_ds"].mimeType.should == "application/json"
+      obj.datastreams["my_ds"].mimeType.should include "application/json"
     end
 
   end
@@ -406,12 +420,14 @@ describe "Integration testing against a live Fedora repository", :integration =>
   describe "search" do
 
     it "should return an array of fedora objects" do
+      pending("no field search in fcrepo4")
       objects = @repository.search('')
 
       objects.map { |x| x.pid }.should include('test:1', 'test:2')
     end
 
     it "should include our new objects" do
+      pending("no field search in fcrepo4")
       pids = []
       @repository.search('') { |obj| pids << obj.pid }
 
@@ -419,6 +435,7 @@ describe "Integration testing against a live Fedora repository", :integration =>
     end
 
     it "should skip forbidden objects" do
+      pending("no field search in fcrepo4")
       # lets say the object test:2 is forbidden
       stub = stub_http_request(:get, /.*test:2.*/).to_return(:status => 401)
       objects = []
