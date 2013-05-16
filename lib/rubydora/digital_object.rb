@@ -145,7 +145,7 @@ module Rubydora
     # Retrieve the object profile as a hash (and cache it)
     # @return [Hash] see Fedora #getObject documentation for keys
     def profile
-      return {} if profile_data.empty?
+      return {} if profile_data.blank?
 
       @profile ||= begin
         Rubydora::Graph.new self.uri, profile_data, OBJ_ATTRIBUTES
