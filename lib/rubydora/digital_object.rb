@@ -30,7 +30,7 @@ module Rubydora
       :logMessage => nil, 
       :lastModifiedDate => "info:fedora/fedora-system:def/internal#lastModified",
       :datastreams => "info:fedora/fedora-system:def/internal#hasChild",
-      :models => "info:fedora/fedora-system:def/internal#mixinTypes"
+      :mixins => "info:fedora/fedora-system:def/internal#mixinTypes"
     }
 
     define_attribute_methods OBJ_ATTRIBUTES.keys
