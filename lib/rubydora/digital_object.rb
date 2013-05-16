@@ -120,7 +120,7 @@ module Rubydora
     # Return a full uri pid (for use in relations, etc
     def uri
       return pid if pid =~ /.+\/.+/
-      "info:fedora/#{pid}"
+      repository.base_url + "/#{pid}"
     end
     alias_method :fqpid, :uri
 
