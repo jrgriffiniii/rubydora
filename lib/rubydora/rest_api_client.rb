@@ -63,11 +63,21 @@ module Rubydora
 
     def describe options = {}
       query_options = options.dup
-      query_options[:xml] ||= 'true'
       client[describe_repository_url(query_options)].get
     rescue Exception => exception
       rescue_with_handler(exception) || raise
     end
+
+    def add_namespace options = {}
+      query_options = options.dup
+      prefix = query_options.delete(:prefix)
+      uri = query_options.delete(:uri)
+      client[add_namespace_url(prefix, query_options)].post uri
+
+    rescue Exception => exception
+      rescue_with_handler(exception) || raise
+    end
+
 
     # {include:RestApiClient::API_DOCUMENTATION}
     # @param [Hash] options

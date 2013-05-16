@@ -16,6 +16,10 @@ module Rubydora
       url_for("fcr:describe", options)
     end
 
+    def add_namespace_url prefix, options = nil
+      url_for("fcr:namespaces/" + prefix, options)
+    end
+
     # Generate a base object REST API endpoint URI
     # @param [String] pid
     # @param [Hash] options to convert to URL parameters
@@ -25,13 +29,13 @@ module Rubydora
     end
 
     def new_object_url options = nil
-      url_for "objects/fcr:new", options
+      url_for "fcr:new", options
     end
 
     # @param [Hash] options to convert to URL parameters
     # @return [String] URI
     def next_pid_url options = nil
-      url_for("objects/nextPID", options)
+      url_for("fcr:nextPID", options)
     end
 
     # @param [Hash] options to convert to URL parameters
