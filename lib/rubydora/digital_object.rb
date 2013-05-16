@@ -42,7 +42,15 @@ module Rubydora
       end
 
       def #{attribute.to_s}= val
-        #{attribute.to_s}_will_change! unless val == #{attribute.to_s}
+        if #{attribute.to_s}.nil? && val.nil?
+          return
+        end
+
+        if val == #{attribute.to_s} || (#{attribute.to_s}.respond_to?(:length) && #{attribute.to_s}.length == 1 && val == #{attribute.to_s}.first)
+          return
+        end
+
+        #{attribute.to_s}_will_change!
         @#{attribute.to_s} = val
       end
       RUBY
