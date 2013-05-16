@@ -11,15 +11,15 @@ module Rubydora
     # @return [ArrayWithCallback<Rubydora::DigitalObject>] an array that will call the #relationship_changed callback when values are modified 
     def models args = {}
       @models = nil if args.delete(:refetch)
-      @models ||= relationship('info:fedora/fedora-system:def/model#hasModel', :values => args[:values] || profile['objModels'] || [])
+      @models ||= relationship('info:fedora/fedora-system:def/internal#mixinTypes', :values => args[:values] || profile['objModels'] || [])
     end
 
     # provides a setter that behaves as does #models
     def models= arr
       arr &&= [arr] unless arr.is_a? Array
       old = models.dup || []
-      arr = @models = relationship('info:fedora/fedora-system:def/model#hasModel', :values => arr.flatten)
-      relationship_changed('info:fedora/fedora-system:def/model#hasModel', {:+ => arr - old, :- => old - arr }, @models)
+      arr = @models = relationship('info:fedora/fedora-system:def/internal#mixinTypes', :values => arr.flatten)
+      relationship_changed('info:fedora/fedora-system:def/internal#mixinTypes', {:+ => arr - old, :- => old - arr }, @models)
 
       @models
     end
