@@ -74,7 +74,6 @@ module Rubydora
     # @return [String]
     def next_pid options = {}
       query_options = options.dup
-      query_options[:format] ||= 'xml'
       client[next_pid_url(query_options)].post nil
     rescue Exception => exception
       rescue_with_handler(exception) || raise
@@ -201,7 +200,6 @@ module Rubydora
     def object_versions options = {}
       query_options = options.dup
       pid = query_options.delete(:pid)
-      query_options[:format] ||= 'xml'
       raise ArgumentError, "Must have a pid" unless pid
       client[object_versions_url(pid, query_options)].get
     rescue Exception => exception
@@ -216,7 +214,6 @@ module Rubydora
       query_options = options.dup
       pid = query_options.delete(:pid)
       raise ArgumentError, "Missing required parameter :pid" unless pid
-      query_options[:format] ||= 'xml'
       client[object_xml_url(pid, query_options)].get
     rescue Exception => exception
         rescue_with_handler(exception) || raise
@@ -235,7 +232,6 @@ module Rubydora
       dsid = query_options.delete(:dsid)
       raise ArgumentError, "Missing required parameter :pid" unless pid
 
-      query_options[:format] ||= 'xml'
       val = nil
       benchmark "Loaded datastream profile #{pid}/#{dsid}", :level=>:debug do
         val = client[datastream_url(pid, dsid, query_options)].get :accept => "application/n-triples"
@@ -258,7 +254,6 @@ module Rubydora
       query_options = options.dup
       pid = query_options.delete(:pid)
       raise ArgumentError, "Missing required parameter :pid" unless pid
-      query_options[:format] ||= 'xml'
       val = nil
       benchmark "Loaded datastream list for #{pid}", :level=>:debug do
         val = client[datastreams_url(pid, query_options)].get
@@ -298,7 +293,6 @@ module Rubydora
       pid = query_options.delete(:pid)
       dsid = query_options.delete(:dsid)
       raise ArgumentError, "Must supply dsid" unless dsid
-      query_options[:format] ||= 'xml'
       client[datastream_history_url(pid, dsid, query_options)].get
     rescue RestClient::ResourceNotFound => e
       #404 Resource Not Found: No datastream history could be found. There is no datastream history for the digital object "changeme:1" with datastream ID of "descMetadata
@@ -423,7 +417,6 @@ module Rubydora
       query_options = options.dup
       pid = query_options.delete(:pid) || query_options[:subject]
       raise ArgumentError, "Missing required parameter :pid" unless pid
-      query_options[:format] ||= 'xml'
       client[object_relationship_url(pid, query_options)].get
     rescue Exception => exception
         rescue_with_handler(exception) || raise
@@ -466,7 +459,6 @@ module Rubydora
       pid = query_options.delete(:pid)
       sdef = query_options.delete(:sdef)
       method = query_options.delete(:method)
-      query_options[:format] ||= 'xml' unless pid and sdef and method
       if block_given?
         resource = safe_subresource(dissemination_url(pid,sdef,method,query_options), :block_response => block_response)
       else

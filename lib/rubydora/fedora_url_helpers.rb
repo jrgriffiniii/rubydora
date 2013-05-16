@@ -57,7 +57,7 @@ module Rubydora
     # @param [Hash] options to convert to URL parameters
     # @return [String] URI
     def datastream_url pid, dsid, options = nil
-      raise "" unless pid and dsid
+      raise "must provide both a pid and dsid" unless pid and dsid
       url_for(object_url(pid) + "/#{CGI::escape(dsid)}", options)
     end
 
