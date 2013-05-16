@@ -315,7 +315,7 @@ module Rubydora
     # Add datastream to Fedora
     # @return [Rubydora::Datastream]
     def create
-      save if new?
+      save
     end
 
     # Modify or save the datastream
