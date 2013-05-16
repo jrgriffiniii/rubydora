@@ -19,6 +19,10 @@ module Rubydora
       check_repository_version!
     end
 
+    def base_url
+      @config[:url]
+    end
+
     # {include:DigitalObject.find}
     def find pid
       DigitalObject.find(pid, self)

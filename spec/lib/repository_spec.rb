@@ -14,6 +14,13 @@ describe Rubydora::Repository do
     end
   end
 
+  describe "base_url" do
+    it "should be the configured base url" do
+      repository = Rubydora::Repository.new :url => 'http://xyz'
+      repository.base_url.should == "http://xyz"
+    end
+  end
+
   describe "client" do
     it "should return a RestClient resource" do
       client = @repository.client
