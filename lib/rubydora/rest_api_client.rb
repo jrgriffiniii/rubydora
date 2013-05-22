@@ -63,7 +63,7 @@ module Rubydora
 
     def describe options = {}
       query_options = options.dup
-      client[describe_repository_url(query_options)].get
+      client[describe_repository_url(query_options)].get  :accept => "application/n-triples"
     rescue Exception => exception
       rescue_with_handler(exception) || raise
     end

@@ -4,7 +4,8 @@ describe Rubydora::Repository do
   include Rubydora::FedoraUrlHelpers
   
   before(:each) do
-    @repository = Rubydora::Repository.new
+    Rubydora::Repository.any_instance.stub(:version).and_return(4.0)
+    @repository = Rubydora::Repository.new :url => 'http://localhost/fcrepo'
   end
 
   describe "initialize" do
@@ -48,27 +49,17 @@ describe Rubydora::Repository do
     end
   end
 
-
-  describe "sparql" do
-    it "should return csv results for sparql queries" do
-      resource_index_query = ""
-      @repository.should_receive(:risearch).with(resource_index_query).and_return("pid\na\nb\nc\n")
-
-      csv = @repository.sparql(resource_index_query)
-    end
-  end
-
   describe "profile" do
     it "should map the fedora repository description to a hash" do
       @mock_response = mock()
       @mock_client = mock(RestClient::Resource)
       @mock_response.should_receive(:get).and_return <<-XML
-        <?xml version="1.0" encoding="UTF-8"?><fedoraRepository  xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.fedora.info/definitions/1/0/access/ http://www.fedora.info/definitions/1/0/fedoraRepository.xsd"><repositoryName>Fedora Repository</repositoryName><repositoryBaseURL>http://localhost:8983/fedora</repositoryBaseURL><repositoryVersion>3.3</repositoryVersion><repositoryPID>    <PID-namespaceIdentifier>changeme</PID-namespaceIdentifier>    <PID-delimiter>:</PID-delimiter>    <PID-sample>changeme:100</PID-sample>    <retainPID>*</retainPID></repositoryPID><repositoryOAI-identifier>    <OAI-namespaceIdentifier>example.org</OAI-namespaceIdentifier>    <OAI-delimiter>:</OAI-delimiter>    <OAI-sample>oai:example.org:changeme:100</OAI-sample></repositoryOAI-identifier><sampleSearch-URL>http://localhost:8983/fedora/search</sampleSearch-URL><sampleAccess-URL>http://localhost:8983/fedora/get/demo:5</sampleAccess-URL><sampleOAI-URL>http://localhost:8983/fedora/oai?verb=Identify</sampleOAI-URL><adminEmail>bob@example.org</adminEmail><adminEmail>sally@example.org</adminEmail></fedoraRepository>
+      <http://localhost/fcrepo> <http://purl.org/dc/terms/title> "label" .
       XML
-      @mock_client.should_receive(:[]).with(describe_repository_url(:xml=> true)).and_return(@mock_response)
+      @mock_client.should_receive(:[]).with(describe_repository_url).and_return(@mock_response)
       @repository.should_receive(:client).and_return(@mock_client)
       profile = @repository.profile
-      profile['repositoryVersion'].should == '3.3'
+      profile['http://purl.org/dc/terms/title'].should include 'label'
     end
   end
 
@@ -88,22 +79,6 @@ describe Rubydora::Repository do
     it "should load an abstraction layer for relationships for older versions of the fedora rest api" do
       Rubydora::Repository.any_instance.stub(:version).and_return(3.3)
       expect { Rubydora::Repository.new }.to raise_error
-    end
-  end
-
-  describe "find_by_sparql" do
-    it "should attempt to load objects from the results of a sparql query" do
-
-      resource_index_query = ""
-      @repository.should_receive(:risearch).with(resource_index_query).and_return("pid\na\nb\nc\n")
-
-      @repository.should_receive(:find).with('a').and_return(1)
-      @repository.should_receive(:find).with('b').and_return(1)
-      @repository.should_receive(:find).with('c').and_return(1)
-
-      objects = @repository.find_by_sparql(resource_index_query)
-
-      objects.length.should == 3
     end
   end
 

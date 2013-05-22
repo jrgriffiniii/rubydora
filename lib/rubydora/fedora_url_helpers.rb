@@ -13,7 +13,7 @@ module Rubydora
     end
 
     def describe_repository_url options = nil
-      url_for("fcr:describe", options)
+      url_for("/", options)
     end
 
     def add_namespace_url prefix, options = nil

@@ -53,12 +53,13 @@ describe "Integration testing against a live Fedora repository", :integration =>
   end
 
   it "should not have default datastreams" do
-    obj = @repository.find('test:1')
+    obj = @repository.find_or_initialize('test:1')
     obj.datastreams.keys.should be_empty
   end
 
   it "should list object models" do
-    obj = @repository.find('test:1')
+    obj = @repository.find_or_initialize('test:1')
+    obj.save
     obj.models.should include("fedora:resource")
   end
 

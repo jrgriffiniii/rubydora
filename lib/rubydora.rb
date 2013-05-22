@@ -3,10 +3,11 @@ require 'active_model'
 require 'deprecation'
 
 module Rubydora
+  autoload :Node, "rubydora/node"
   autoload :Graph, "rubydora/graph"
+  autoload :PropertyDiff, "rubydora/property_diff"
   autoload :Datastream, "rubydora/datastream"
   autoload :Repository, "rubydora/repository"
-  autoload :ResourceIndex, "rubydora/resource_index"
   autoload :FedoraUrlHelpers, "rubydora/fedora_url_helpers"
   autoload :RestApiClient, "rubydora/rest_api_client"
   autoload :ModelsMixin, "rubydora/models_mixin"

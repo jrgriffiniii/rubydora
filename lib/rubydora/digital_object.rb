@@ -9,51 +9,105 @@ module Rubydora
   # Using the extension framework, implementors may 
   # provide additional functionality to this base 
   # implementation.
-  class DigitalObject
+  class DigitalObject < Node
     extend ActiveModel::Callbacks
     define_model_callbacks :save, :create, :destroy
     define_model_callbacks :initialize, :only => :after
     include ActiveModel::Dirty
-    include Rubydora::ModelsMixin
-    include Rubydora::RelationshipsMixin
     include Rubydora::AuditTrail
 
     extend Deprecation
 
     attr_reader :pid
     
+
+
+        RELS_EXT = {"annotations"=>"info:fedora/fedora-system:def/relations-external#hasAnnotation",
+                "has_metadata"=>"info:fedora/fedora-system:def/relations-external#hasMetadata",
+                "description_of"=>"info:fedora/fedora-system:def/relations-external#isDescriptionOf",
+                "part_of"=>"info:fedora/fedora-system:def/relations-external#isPartOf",
+                "descriptions"=>"info:fedora/fedora-system:def/relations-external#hasDescription",
+                "dependent_of"=>"info:fedora/fedora-system:def/relations-external#isDependentOf",
+                "constituents"=>"info:fedora/fedora-system:def/relations-external#hasConstituent",
+                "parts"=>"info:fedora/fedora-system:def/relations-external#hasPart",
+                "memberOfCollection"=>"info:fedora/fedora-system:def/relations-external#isMemberOfCollection",
+                "member_of"=>"info:fedora/fedora-system:def/relations-external#isMemberOf",
+                "equivalents"=>"info:fedora/fedora-system:def/relations-external#hasEquivalent",
+                "derivations"=>"info:fedora/fedora-system:def/relations-external#hasDerivation",
+                "derivation_of"=>"info:fedora/fedora-system:def/relations-external#isDerivationOf",
+                "subsets"=>"info:fedora/fedora-system:def/relations-external#hasSubset",
+                "annotation_of"=>"info:fedora/fedora-system:def/relations-external#isAnnotationOf",
+                "metadata_for"=>"info:fedora/fedora-system:def/relations-external#isMetadataFor",
+                "dependents"=>"info:fedora/fedora-system:def/relations-external#hasDependent",
+                "subset_of"=>"info:fedora/fedora-system:def/relations-external#isSubsetOf",
+                "constituent_of"=>"info:fedora/fedora-system:def/relations-external#isConstituentOf",
+                "collection_members"=>"info:fedora/fedora-system:def/relations-external#hasCollectionMember",
+                "members"=>"info:fedora/fedora-system:def/relations-external#hasMember"}
+
     # mapping object parameters to profile elements
-    OBJ_ATTRIBUTES = {
+    OBJ_ATTRIBUTES = RELS_EXT.merge({
       :state => "info:fedora3/state", 
       :ownerId => "http://purl.org/dc/terms/creator", 
       :label => "http://purl.org/dc/terms/title", 
       :logMessage => nil, 
       :lastModifiedDate => "info:fedora/fedora-system:def/internal#lastModified",
       :datastreams => "info:fedora/fedora-system:def/internal#hasChild",
-      :mixins => "info:fedora/fedora-system:def/internal#mixinTypes"
-    }
+      :models => 'info:fedora/fedora-system:def/internal#mixinTypes'
+    })
+
 
     define_attribute_methods OBJ_ATTRIBUTES.keys
       
     OBJ_ATTRIBUTES.each do |attribute, profile_name|
       class_eval <<-RUBY
       def #{attribute.to_s}
-        @#{attribute} || profile["#{profile_name.to_s}"]
+        return attribute_reader("#{attribute}", "#{profile_name}")
       end
 
       def #{attribute.to_s}= val
-        if #{attribute.to_s}.nil? && val.nil?
-          return
-        end
-
-        if val == #{attribute.to_s} || (#{attribute.to_s}.respond_to?(:length) && #{attribute.to_s}.length == 1 && val == #{attribute.to_s}.first)
-          return
-        end
-
-        #{attribute.to_s}_will_change!
-        @#{attribute.to_s} = val
+        return attribute_setter("#{attribute}", val)
       end
       RUBY
+    end
+
+    def attribute_reader attribute_name, profile_field = nil
+      return instance_variable_get("@" + attribute_name) if instance_variable_defined? "@" + attribute_name
+
+      val = profile[profile_field]
+
+      if val.is_a? Array
+        obj = self
+        arr = ArrayWithCallback.new val
+        arr.on_change << lambda { |arr, diff| obj.multivalued_attribute_will_change! attribute_name, diff }
+        arr
+      else
+        val
+      end
+    end
+
+    def attribute_setter attribute_name, val
+      current_value = send(attribute_name)
+
+      if current_value.nil? && val.nil?
+        return
+      end
+
+      if val == current_value 
+      elsif current_value.kind_of?(Array) && current_value.length == 1 && val == current_value.first
+
+      else 
+        send(attribute_name + "_will_change!")
+      end
+        
+      if val.is_a? Array
+        obj = self
+        arr = ArrayWithCallback.new val
+        arr.on_change << lambda { |arr, diff| obj.multivalued_attribute_will_change! attribute_name, diff }
+        instance_variable_set("@" + attribute_name, arr)
+      else
+        instance_variable_set("@" + attribute_name, val)
+      end
+
     end
 
     def state= val
@@ -111,7 +165,7 @@ module Rubydora
         @options = options
 
         options.each do |key, value|
-          self.send(:"#{key}=", value)
+          send("#{key}=", value)
         end
       end
     end
@@ -120,7 +174,12 @@ module Rubydora
     # Return a full uri pid (for use in relations, etc
     def uri
       return pid if pid =~ /.+\/.+/
-      repository.base_url + "/#{pid}"
+      if pid =~ /^\//
+        repository.base_url + "#{pid}"
+      else
+        repository.base_url + "/#{pid}"
+      end
+
     end
     alias_method :fqpid, :uri
 
@@ -219,9 +278,11 @@ module Rubydora
           repository.modify_object :pid => pid, :query => query if query
           @profile = nil #will cause a reload with updated data
           @profile_data = nil
-        else                       
+        else                   
           repository.modify_object :pid => pid, :query => query if query
         end
+        @changed_attributes.clear
+
       end
 
       self.datastreams.select { |dsid, ds| ds.needs_to_be_saved? }.each { |dsid, ds| ds.save }
@@ -235,10 +296,12 @@ module Rubydora
       my_pid = pid
       run_callbacks :destroy do
         @datastreams = nil
+        @attributes = {}
         @profile = nil
         @profile_xml = nil
         @pid = nil
         @graph = nil
+        @models = nil
         nil
       end
       repository.purge_object(:pid => my_pid) ##This can have a meaningful exception, don't put it in the callback
@@ -262,15 +325,39 @@ module Rubydora
       deletes = []
       inserts = []
 
-      return unless changed and !changes.empty?
-
       changes.map do |k, (old_value, new_value)|
         Array(old_value).each do |v|
+          if v.is_a? Rubydora::Node
+            v = v.uri
+          end
+
           deletes << "<#{uri}> <#{OBJ_ATTRIBUTES[k.to_sym].to_s}> \"#{RDF::NTriples::Writer.escape(v)}\" . " if v
         end
         Array(new_value).each do |v|
+          if v.is_a? Rubydora::Node
+            v = v.uri
+          end
           inserts << "<#{uri}> <#{OBJ_ATTRIBUTES[k.to_sym].to_s}> \"#{RDF::NTriples::Writer.escape(v)}\" . " if v
         end
+      end
+
+      changed_multivalued_attributes.map do |k, diff|
+        diff[:-].each do |v|     
+          if v.is_a? Rubydora::Node
+            v = v.uri
+          end  
+          deletes << "<#{uri}> <#{OBJ_ATTRIBUTES[k.to_sym].to_s}> \"#{RDF::NTriples::Writer.escape(v)}\" . " if v
+        end
+        diff[:+].each do |v|    
+          if v.is_a? Rubydora::Node
+            v = v.uri
+          end   
+          inserts << "<#{uri}> <#{OBJ_ATTRIBUTES[k.to_sym].to_s}> \"#{RDF::NTriples::Writer.escape(v)}\" . " if v
+        end
+      end
+
+      if deletes.empty? and inserts.empty?
+        return
       end
 
       query = ""
@@ -297,7 +384,22 @@ module Rubydora
       raise "Can't change values on older versions" if @asOfDateTime
     end
 
+    def multivalued_attribute_will_change! attribute_name, diff = {}
+      check_if_read_only
+      was = changed_multivalued_attributes[attribute_name] ||= {:- => [], :+ => []}
+
+
+      was[:-] = (was[:-] - diff[:+]) + (diff[:-])
+      was[:+] = (was[:+] - diff[:-]) + (diff[:+])
+
+      changed_multivalued_attributes[attribute_name] = was
+    end
+
     private
+    def changed_multivalued_attributes
+      @changed_multivalued_attributes ||= {}
+    end
+
     def attribute_will_change! *args
       check_if_read_only
       super

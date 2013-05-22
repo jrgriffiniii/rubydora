@@ -3,7 +3,7 @@ module Rubydora
   # This class represents a Fedora datastream object
   # and provides helper methods for creating and manipulating
   # them. 
-  class Datastream
+  class Datastream < Node
     extend Deprecation
     extend ActiveModel::Callbacks
     define_model_callbacks :save, :create, :destroy
@@ -54,19 +54,31 @@ module Rubydora
 
       class_eval %Q{
       def #{attribute.to_s}= val
-        validate_#{attribute.to_s}!(val) if respond_to?(:validate_#{attribute.to_s}!, true)
-        #{attribute.to_s}_will_change! unless val == #{attribute.to_s}
+        if #{attribute.to_s}.nil? && val.nil?
+          return
+        end
+
+        if val == #{attribute.to_s} || (#{attribute.to_s}.kind_of?(Array) && #{attribute.to_s}.length == 1 && val == #{attribute.to_s}.first)
+          @#{attribute.to_s} = val
+          return
+        end
+
+        #{attribute.to_s}_will_change!
         @#{attribute.to_s} = val
       end
       }
     end
 
     def dsChecksumValid
-      profile(:validateChecksum=>true)['dsChecksumValid']
+      true # profile(:validateChecksum=>true)['dsChecksumValid']
     end
 
     def dsCreateDate
-      Time.parse(profile["info:fedora/fedora-system:def/internal#created"].first)
+      t = profile["info:fedora/fedora-system:def/internal#created"].first
+
+      if t
+        Time.parse(t)
+      end
     end
     alias_method :createDate, :dsCreateDate
 
@@ -225,6 +237,7 @@ module Rubydora
     end
 
     def has_content?
+      return true if @content
       # persisted objects are required to have content
       return true unless new?
 
@@ -246,8 +259,8 @@ module Rubydora
     # @param [Integer] from (bytes) the starting point you want to return. 
     # 
     def stream (from = 0, length = nil)
-      raise "Can't determine dsSize" unless dsSize
-      length = dsSize - from unless length
+      raise "Can't determine bitstream size" unless size
+      length = size - from unless length
       counter = 0
       Enumerator.new do |blk|
         repository.datastream_dissemination(:pid => pid, :dsid => dsid) do |response|
@@ -276,7 +289,7 @@ module Rubydora
     # Retrieve the object profile as a hash (and cache it)
     # @return [Hash] see Fedora #getObject documentation for keys
     def profile
-      return {} if profile_data.empty?
+      return {} if profile_data.blank?
 
       @profile ||= begin
         Rubydora::Graph.new self.uri, profile_data, DS_ATTRIBUTES
@@ -284,6 +297,10 @@ module Rubydora
     end
 
     def profile_data
+      if repository.nil?
+        return nil
+      end
+
       @profile_data ||= begin
         repository.datastream(:pid => pid, :dsid => dsid)
       rescue RestClient::ResourceNotFound => e
@@ -403,7 +420,11 @@ module Rubydora
     # repository reference from the digital object
     # @return [Rubydora::Repository]
     def repository
-      digital_object.repository
+      if digital_object.respond_to? :repository
+        digital_object.repository
+      else
+        nil
+      end
     end
 
     def asOfDateTime= val
@@ -438,10 +459,10 @@ module Rubydora
 
       changes.map do |k, (old_value, new_value)|
         Array(old_value).each do |v|
-          deletes << "<#{uri}> <#{DS_ATTRIBUTES[k.to_sym].to_s}> \"#{RDF::NTriples::Writer.escape(v)}\" . " if v
+          deletes << "<#{uri}> <#{DS_ATTRIBUTES[k.to_sym].to_s}> \"#{escape_sparql_objects(v)}\" . " if v
         end
         Array(new_value).each do |v|
-          inserts << "<#{uri}> <#{DS_ATTRIBUTES[k.to_sym].to_s}> \"#{RDF::NTriples::Writer.escape(v)}\" . " if v
+          inserts << "<#{uri}> <#{DS_ATTRIBUTES[k.to_sym].to_s}> \"#{escape_sparql_objects(v)}\" . " if v
         end
       end
 
@@ -454,6 +475,17 @@ module Rubydora
       query += "WHERE { }"
 
       query
+
+    end
+
+    def escape_sparql_objects v
+      case v
+      when TrueClass, FalseClass
+        v.to_s
+      else
+
+      RDF::NTriples::Writer.escape(v)
+      end
 
     end
   end

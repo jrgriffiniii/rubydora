@@ -2,9 +2,13 @@ require 'active_support/core_ext/hash/indifferent_access'
 
 module Rubydora
   # Fedora Repository object that provides API access
-  class Repository
-    include ResourceIndex
+  class Repository < Node
     include RestApiClient
+
+
+    REPO_ATTRIBUTES = {
+
+    }
 
     # repository configuration (see #initialize)
     attr_reader :config
@@ -21,6 +25,10 @@ module Rubydora
 
     def base_url
       @config[:url]
+    end
+
+    def uri
+      base_url
     end
 
     # {include:DigitalObject.find}
@@ -81,28 +89,15 @@ module Rubydora
     # @return [Hash]
     def profile
       @profile ||= begin
-        profile_xml = self.describe.strip
-        profile_xml.gsub! '<fedoraRepository', '<fedoraRepository xmlns="http://www.fedora.info/definitions/1/0/access/"' unless profile_xml =~ /xmlns=/
-        doc = Nokogiri::XML(profile_xml)
-        xmlns = { 'access' => "http://www.fedora.info/definitions/1/0/access/"  }
-        h = doc.xpath('/access:fedoraRepository/*', xmlns).inject({}) do |sum, node|
-                     sum[node.name] ||= []
-                     case node.name
-                       when "repositoryPID"
-                         sum[node.name] << Hash[*node.xpath('access:*', xmlns).map { |x| [node.name, node.text]}.flatten]
-                       else
-                         sum[node.name] << node.text
-                     end
-                     sum
-                   end
-        h.select { |key, value| value.length == 1 }.each do |key, value|
-          next if key == "objModels"
-          h[key] = value.first
-        end
+        Rubydora::Graph.new self.uri, profile_data, REPO_ATTRIBUTES
+      end
+    end
 
-        h
-      rescue
-        nil
+    def profile_data
+      @profile_data ||= begin
+        self.describe
+      rescue RestClient::ResourceNotFound => e
+        ""
       end
     end
 

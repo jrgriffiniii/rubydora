@@ -212,29 +212,30 @@ describe Rubydora::DigitalObject do
     end
 
     it "should add models to fedora" do
-      @mock_repository.should_receive(:add_relationship) do |params|
-        params.should have_key(:subject)
-        params[:predicate].should == 'info:fedora/fedora-system:def/internal#mixinTypes'
-        params[:object].should == 'asdf'
+      @mock_repository.should_receive(:modify_object) do |params|
+        params[:query].should =~ /asdf/
       end
       @object.models << "asdf"
+      @object.save
     end
 
     it "should remove models from fedora" do
-      @object.should_receive(:profile).any_number_of_times.and_return({"objModels" => ['asdf']})
-      @mock_repository.should_receive(:purge_relationship) do |params|
-        params.should have_key(:subject)
-        params[:predicate].should == 'info:fedora/fedora-system:def/internal#mixinTypes'
-        params[:object].should == 'asdf'
+      @object.should_receive(:profile).any_number_of_times.and_return({'info:fedora/fedora-system:def/internal#mixinTypes' => ['asdf']})
+      @mock_repository.should_receive(:modify_object) do |params|
+        params[:query].should =~ /asdf/
       end
       @object.models.delete("asdf")
+      @object.save
     end
 
     it "should be able to handle complete model replacemenet" do
-      @object.should_receive(:profile).any_number_of_times.and_return({"objModels" => ['asdf']})
-      @mock_repository.should_receive(:add_relationship).with(instance_of(Hash))
-      @mock_repository.should_receive(:purge_relationship).with(instance_of(Hash))
+      @mock_repository.should_receive(:modify_object) do |params|
+        params[:query].should =~ /asdf/
+      end
+    
+      @object.should_receive(:profile).any_number_of_times.and_return({'info:fedora/fedora-system:def/internal#mixinTypes' => ['asdf']})
       @object.models = '1234'
+      @object.save
 
     end
   end
@@ -248,33 +249,22 @@ describe Rubydora::DigitalObject do
       @object = Rubydora::DigitalObject.new 'pid', @mock_repository
     end
 
-    it "should fetch related objects using sparql" do
-      @mock_repository.should_receive(:find_by_sparql_relationship).with('http://repository/pid', 'info:fedora/fedora-system:def/relations-external#hasPart').and_return([1])
-      @object.parts.should == [1]
-    end
-
     it "should add related objects" do
-      @mock_repository.should_receive(:add_relationship) do |params|
-        params.should have_key(:subject)
-        params[:predicate].should == 'info:fedora/fedora-system:def/relations-external#hasPart'
-        params[:object].should == 'asdf'
+      @mock_repository.should_receive(:modify_object) do |params|
+        params[:query].should =~ /asdf/
       end
-      @mock_object = mock(Rubydora::DigitalObject)
-      @mock_object.should_receive(:fqpid).and_return('asdf')
-      @mock_repository.should_receive(:find_by_sparql_relationship).with('http://repository/pid', 'info:fedora/fedora-system:def/relations-external#hasPart').and_return([])
-      @object.parts << @mock_object
+      @object.parts << 'asdf'
+      @object.save
     end
 
     it "should remove related objects" do
-      @mock_repository.should_receive(:purge_relationship) do |params|
-        params.should have_key(:subject)
-        params[:predicate].should == 'info:fedora/fedora-system:def/relations-external#hasPart'
-        params[:object].should == 'asdf'
+      @object.parts = ['asdf']
+
+      @mock_repository.should_receive(:modify_object) do |params|
+        params[:query].should =~ /asdf/
       end
-      @mock_object = mock(Rubydora::DigitalObject)
-      @mock_object.should_receive(:fqpid).and_return('asdf')
-      @mock_repository.should_receive(:find_by_sparql_relationship).with('http://repository/pid', 'info:fedora/fedora-system:def/relations-external#hasPart').and_return([@mock_object])
-      @object.parts.delete(@mock_object)
+      @object.parts.delete('asdf')
+      @object.save
     end
   end
 
