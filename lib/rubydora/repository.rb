@@ -24,7 +24,7 @@ module Rubydora
     end
 
     def base_url
-      @config[:url]
+      @config[:url].gsub(/^\//, '')
     end
 
     def uri

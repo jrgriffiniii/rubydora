@@ -25,7 +25,7 @@ module Rubydora
     # @param [Hash] options to convert to URL parameters
     # @return [String] URI
     def object_url path, options = nil
-      url_for("#{CGI::escape(path.to_s.gsub('info:fedora', ''))}", options)
+      url_for("#{CGI::escape(path.to_s.gsub('info:fedora', '').gsub(/^\//, ''))}", options)
     end
 
     def new_object_url options = nil
