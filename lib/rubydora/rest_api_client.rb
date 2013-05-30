@@ -84,7 +84,7 @@ module Rubydora
     # @return [String]
     def next_pid options = {}
       query_options = options.dup
-      client[next_pid_url(query_options)].post nil
+      client[next_pid_url(query_options)].post nil,  :accept => "application/n-triples"
     rescue Exception => exception
       rescue_with_handler(exception) || raise
     end
