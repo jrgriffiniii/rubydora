@@ -44,8 +44,9 @@ module Rubydora
     # @params [Hash] options
     # @option options [String] :namespace the namespece for the pid
     def mint(options={})
-      d = Nokogiri::XML(next_pid(options))
-      d.xpath('//fedora:pid', 'fedora' => 'http://www.fedora.info/definitions/1/0/management/').text
+      graph = Rubydora::Graph.new uri + "/" + next_pid_url, next_pid(options), { :pid => 'info:fedora/fedora-system:def/internal#hasMember'}
+      
+      graph[:pid].map { |x| x.gsub uri, '' }.first
     end
 
     # High-level access to the Fedora find_objects API
