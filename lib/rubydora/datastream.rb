@@ -455,9 +455,9 @@ module Rubydora
       deletes = []
       inserts = []
 
-      return unless changed and !changes.empty?
 
       changes.map do |k, (old_value, new_value)|
+        next if k.to_s == "content"
         Array(old_value).each do |v|
           deletes << "<#{uri}> <#{DS_ATTRIBUTES[k.to_sym].to_s}> \"#{escape_sparql_objects(v)}\" . " if v
         end
@@ -465,6 +465,8 @@ module Rubydora
           inserts << "<#{uri}> <#{DS_ATTRIBUTES[k.to_sym].to_s}> \"#{escape_sparql_objects(v)}\" . " if v
         end
       end
+
+      return if deletes.empty? and inserts.empty?
 
       query = ""
 
