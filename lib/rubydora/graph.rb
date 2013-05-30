@@ -24,6 +24,15 @@ module Rubydora
       end
     end
 
+    def each_pair &block
+      mapping.each do |k,v|
+        next if v.nil?
+        Array(self[v]).each do |val|
+          yield k, val
+        end
+      end
+    end
+
     def with_subject new_subject
       Rubydora::Graph.new new_subject, rdf, mapping
     end
