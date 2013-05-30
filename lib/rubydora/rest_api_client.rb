@@ -72,7 +72,7 @@ module Rubydora
       query_options = options.dup
       prefix = query_options.delete(:prefix)
       uri = query_options.delete(:uri)
-      client[add_namespace_url(prefix, query_options)].post uri
+      client[namespace_url].post "INSERT { <#{uri}> <info:fedora/fedora-system:def/internal#hasNamespace> '#{prefix}' } WHERE {}", :content_type => 'application/sparql-update'
 
     rescue Exception => exception
       rescue_with_handler(exception) || raise

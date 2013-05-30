@@ -16,8 +16,8 @@ module Rubydora
       url_for("/", options)
     end
 
-    def add_namespace_url prefix, options = nil
-      url_for("fcr:namespaces/" + prefix, options)
+    def namespace_url options = nil
+      url_for("fcr:namespaces", options)
     end
 
     # Generate a base object REST API endpoint URI
