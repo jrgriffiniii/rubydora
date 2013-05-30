@@ -50,6 +50,7 @@ module Rubydora
       :ownerId => "http://purl.org/dc/terms/creator", 
       :label => "http://purl.org/dc/terms/title", 
       :logMessage => nil, 
+      :createdDate => "info:fedora/fedora-system:def/internal#created",
       :lastModifiedDate => "info:fedora/fedora-system:def/internal#lastModified",
       :datastreams => "info:fedora/fedora-system:def/internal#hasChild",
       :models => 'info:fedora/fedora-system:def/internal#mixinTypes'
