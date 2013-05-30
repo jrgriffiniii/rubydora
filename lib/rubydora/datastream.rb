@@ -30,7 +30,7 @@ module Rubydora
       :mimeType => "http://purl.org/dc/terms/type",
       :logMessage => nil, 
       :ignoreContent => nil, 
-      :lastModifiedDate => nil, 
+      :lastModifiedDate => "info:fedora/fedora-system:def/internal#lastModified", 
       :content => nil, 
       :asOfDateTime => nil
     }
