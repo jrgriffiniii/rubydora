@@ -465,6 +465,7 @@ describe Rubydora::Datastream do
       end
 
       it "should be the current version" do
+        pending
         @mock_repository.stub(:datastream).with(hash_including(:pid => 'pid', :dsid => 'dsid')).and_return <<-XML
           <datastreamProfile>
             <dsVersionID>dsid.1</dsVersionID>
@@ -475,6 +476,7 @@ describe Rubydora::Datastream do
       end
 
       it "should be the current version if it's the first version" do
+        pending
         @mock_repository.stub(:datastream).with(hash_including(:pid => 'pid', :dsid => 'dsid', :asOfDateTime =>'2010-01-02T00:00:00.012Z')).and_return <<-XML
           <datastreamProfile>
             <dsVersionID>dsid.1</dsVersionID>
@@ -485,6 +487,7 @@ describe Rubydora::Datastream do
       end
 
       it "should not be the current version if it's the second version" do
+        pending
         @mock_repository.stub(:datastream).with(hash_including(:pid => 'pid', :dsid => 'dsid', :asOfDateTime => '2008-08-05T01:30:05.012Z')).and_return <<-XML
           <datastreamProfile>
             <dsVersionID>dsid.0</dsVersionID>

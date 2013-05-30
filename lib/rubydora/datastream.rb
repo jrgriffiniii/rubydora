@@ -308,6 +308,15 @@ module Rubydora
       end
     end
 
+    def profile= data
+      if data.is_a? Rubydora::Graph
+        @profile = data
+      else
+        @profile_data = data
+        @profile = nil
+      end
+    end
+
     def profile_xml
       profile_data
     end

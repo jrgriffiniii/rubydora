@@ -35,7 +35,7 @@ module Rubydora
     # @param [Hash] options to convert to URL parameters
     # @return [String] URI
     def next_pid_url options = nil
-      url_for("fcr:nextPID", options)
+      url_for("fcr:pid", options)
     end
 
     # @param [Hash] options to convert to URL parameters
