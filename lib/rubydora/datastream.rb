@@ -34,6 +34,8 @@ module Rubydora
       :content => nil, 
       :asOfDateTime => nil
     }
+
+    DS_SINGLE_VALUED_ATTRIBUTES = [:controlGroup, :dsState, :mimeType]
     
     DS_DEFAULT_ATTRIBUTES = { :controlGroup => 'M', :dsState => 'A', :versionable => true, :mimeType => "application/octet-stream" }
 
@@ -43,7 +45,7 @@ module Rubydora
     DS_ATTRIBUTES.each do |attribute, profile_name|
       class_eval <<-RUBY
       def #{attribute.to_s}
-        return attribute_reader("#{attribute}", "#{profile_name}")
+        return attribute_reader("#{attribute}", "#{profile_name}", #{DS_SINGLE_VALUED_ATTRIBUTES.include? attribute})
       end
 
       def #{attribute.to_s}= val
@@ -64,10 +66,6 @@ module Rubydora
       end
     end
     alias_method :createDate, :dsCreateDate
-
-    def mimeType
-      Array(attribute_reader("mimeType", "http://purl.org/dc/terms/type")).first
-    end
 
     def size
       profile.with_content_subject["info:fedora/size"].first.to_i

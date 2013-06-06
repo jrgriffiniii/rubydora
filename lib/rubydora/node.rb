@@ -11,7 +11,7 @@ module Rubydora
     end
     
 
-    def attribute_reader attribute_name, profile_field = nil
+    def attribute_reader attribute_name, profile_field = nil, single_value = false
       return instance_variable_get("@" + attribute_name) if instance_variable_defined? "@" + attribute_name
 
       val = profile[profile_field]
@@ -20,7 +20,13 @@ module Rubydora
         val = Array(self.default_attributes[attribute_name.to_sym])
       end
 
+
       if val.is_a? Array
+
+        if single_value
+          return val.first
+        end
+
         obj = self
         arr = ArrayWithCallback.new val
         arr.on_change << lambda { |arr, diff| obj.multivalued_attribute_will_change! attribute_name, diff }
