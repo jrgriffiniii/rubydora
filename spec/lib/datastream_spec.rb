@@ -74,8 +74,6 @@ describe Rubydora::Datastream do
     end
 
     it "should have default values" do
-      @datastream.controlGroup == "M"
-      @datastream.dsState.should == "A"
       @datastream.versionable.should be_true
       @datastream.changed.should be_empty
     end
@@ -83,7 +81,7 @@ describe Rubydora::Datastream do
     it "should allow default values to by specified later" do
       @datastream.dsState = 'A'
       @datastream.default_attributes = { :controlGroup => 'E', :dsState => 'I' }
-      @datastream.controlGroup.should == 'E'
+      @datastream.controlGroup.should include 'E'
       @datastream.dsState.should == 'A'
     end
 
@@ -529,20 +527,16 @@ describe Rubydora::Datastream do
       subject { Rubydora::Datastream.new @mock_object, 'dsid' }
 
       describe "getter" do
-        it "should return the value" do
-          subject.instance_variable_set("@#{method}", 'asdf')
-          subject.send(method).should == 'asdf'
-        end
 
         it "should look in the object profile" do
-          subject.should_receive(:profile) { { Rubydora::Datastream::DS_ATTRIBUTES[method.to_sym].to_s => 'qwerty' } }.twice
-          subject.send(method).should == 'qwerty'
+          subject.should_receive(:profile) { Rubydora::Graph.new subject.uri, "<#{subject.uri}> <#{Rubydora::Datastream::DS_ATTRIBUTES[method.to_sym].to_s}> \"qwerty\"", Rubydora::Datastream::DS_ATTRIBUTES }
+          subject.send(method).should include 'qwerty'
         end
 
         it "should fall-back to the set of default attributes" do
           mock_attr = { method.to_sym => 'zxcv' }
-          subject.should_receive(:default_attributes).and_return(mock_attr)
-          subject.send(method).should == 'zxcv'
+          subject.stub(:default_attributes => mock_attr)
+          subject.send(method).should include 'zxcv'
         end
       end
 
@@ -553,6 +547,7 @@ describe Rubydora::Datastream do
         it "should mark the object as changed after setting" do
           subject.send("#{method}=", 'new_value')
           subject.should be_changed
+          subject.send("#{method}").should == 'new_value'
         end
 
         it "should not mark the object as changed if the value does not change" do
@@ -589,8 +584,8 @@ describe Rubydora::Datastream do
 
         it "should fall-back to the set of default attributes" do
           mock_attr = { method.to_sym => 'zxcv' }
-          subject.should_receive(:default_attributes).and_return(mock_attr)
-          subject.send(method).should == 'zxcv'
+          subject.stub(:default_attributes).and_return(mock_attr)
+          subject.send(method).should include 'zxcv'
         end
       end
 
@@ -691,9 +686,10 @@ describe Rubydora::Datastream do
       ### see UnsavedDigitalObject in ActiveFedora
       before(:each) do
         @datastream = Rubydora::Datastream.new stub(:foo), 'dsid'
+        @datastream.stub(:uri => "unsaved:object")
       end
       it "should be empty if the digital_object doesn't have a repository" do
-        @datastream.profile.should == {}
+        @datastream.profile.should be_empty
       end
     end
     describe "with a digital_object that has a repository" do

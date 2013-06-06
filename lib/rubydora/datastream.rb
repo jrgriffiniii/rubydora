@@ -35,38 +35,21 @@ module Rubydora
       :asOfDateTime => nil
     }
     
-    DS_DEFAULT_ATTRIBUTES = { :controlGroup => 'M', :dsState => 'A', :versionable => true }
+    DS_DEFAULT_ATTRIBUTES = { :controlGroup => 'M', :dsState => 'A', :versionable => true, :mimeType => "application/octet-stream" }
 
     define_attribute_methods DS_ATTRIBUTES.keys
 
     # accessors for datastream attributes 
     DS_ATTRIBUTES.each do |attribute, profile_name|
-      define_method attribute.to_s do
-        var = "@#{attribute.to_s}".to_sym
-        if instance_variable_defined?(var)
-          instance_variable_get var
-        elsif profile.has_key? profile_name.to_s
-           profile[profile_name.to_s]
-        else
-          default_attributes[attribute.to_sym]
-        end
+      class_eval <<-RUBY
+      def #{attribute.to_s}
+        return attribute_reader("#{attribute}", "#{profile_name}")
       end
 
-      class_eval %Q{
       def #{attribute.to_s}= val
-        if #{attribute.to_s}.nil? && val.nil?
-          return
-        end
-
-        if val == #{attribute.to_s} || (#{attribute.to_s}.kind_of?(Array) && #{attribute.to_s}.length == 1 && val == #{attribute.to_s}.first)
-          @#{attribute.to_s} = val
-          return
-        end
-
-        #{attribute.to_s}_will_change!
-        @#{attribute.to_s} = val
+        return attribute_setter("#{attribute}", val)
       end
-      }
+      RUBY
     end
 
     def dsChecksumValid
@@ -82,9 +65,14 @@ module Rubydora
     end
     alias_method :createDate, :dsCreateDate
 
+    def mimeType
+      Array(attribute_reader("mimeType", "http://purl.org/dc/terms/type")).first
+    end
+
     def size
       profile.with_content_subject["info:fedora/size"].first.to_i
     end
+    alias_method :dsSize, :size
 
     # Create humanized accessors for the DS attribute  (dsState -> state, dsCreateDate -> createDate)
     (DS_ATTRIBUTES.keys).select { |k| k.to_s =~ /^ds/ }.each do |attribute|
@@ -109,14 +97,6 @@ module Rubydora
 
     def self.default_attributes
       DS_DEFAULT_ATTRIBUTES
-    end
-
-    def default_attributes
-      @default_attributes ||= self.class.default_attributes
-    end
-
-    def default_attributes= attributes
-      @default_attributes = default_attributes.merge attributes
     end
 
     ##
@@ -201,7 +181,7 @@ module Rubydora
     def url
       options = { }
       options[:asOfDateTime] = asOfDateTime if asOfDateTime
-      repository.datastream_url(pid, dsid, options) + "/content"
+      repository.datastream_content_url(pid, dsid, options)
     end
 
     # Set the content of the datastream
@@ -230,6 +210,10 @@ module Rubydora
         end
       end
       super
+    end
+
+    def versionable?
+      versionable.first
     end
 
     def changed?
@@ -289,7 +273,7 @@ module Rubydora
     # Retrieve the object profile as a hash (and cache it)
     # @return [Hash] see Fedora #getObject documentation for keys
     def profile
-      return {} if profile_data.blank?
+      return Rubydora::Graph.new self.uri, "", DS_ATTRIBUTES if profile_data.blank?
 
       @profile ||= begin
         Rubydora::Graph.new self.uri, profile_data, DS_ATTRIBUTES
@@ -385,33 +369,36 @@ module Rubydora
     end
 
     def datastream_will_change!
-      attribute_will_change! :profile
+      attribute_will_change! :datastream
     end
 
     # @return [boolean] is this an external datastream?
     def external?
-      controlGroup == 'E'
+      controlGroup.include? 'E'
     end
 
     # @return [boolean] is this a redirect datastream?
     def redirect?
-      controlGroup == 'R'
+      controlGroup.include? 'R'
     end
 
     # @return [boolean] is this a managed datastream?
     def managed?
-      controlGroup == 'M'
+      controlGroup.include? 'M'
     end
 
     # @return [boolean] is this an inline datastream?
     def inline?
-      controlGroup == 'X'
+      controlGroup.include? 'X'
     end
 
     def needs_to_be_saved?
       changed?
     end
 
+    def self.attributes
+      DS_ATTRIBUTES
+    end
     
 
     protected
@@ -440,10 +427,6 @@ module Rubydora
       @asOfDateTime = val
     end
 
-    def check_if_read_only
-      raise "Can't change values on older versions" if @asOfDateTime
-    end
-
     def validate_dsLocation! val
       URI.parse(val) unless val.nil?
     end
@@ -453,51 +436,6 @@ module Rubydora
     # Rack::Test::UploadedFile is often set via content=, however it's not an IO, though it wraps an io object.
     def behaves_like_io?(obj)
       obj.is_a?(IO) || (defined?(Rack) && obj.is_a?(Rack::Test::UploadedFile))
-    end
-
-    def attribute_will_change! *args
-      check_if_read_only
-      super
-    end
-
-    def serialize_changes_to_sparql_update
-      deletes = []
-      inserts = []
-
-
-      changes.map do |k, (old_value, new_value)|
-        next if k.to_s == "content"
-        Array(old_value).each do |v|
-          deletes << "<#{uri}> <#{DS_ATTRIBUTES[k.to_sym].to_s}> \"#{escape_sparql_objects(v)}\" . " if v
-        end
-        Array(new_value).each do |v|
-          inserts << "<#{uri}> <#{DS_ATTRIBUTES[k.to_sym].to_s}> \"#{escape_sparql_objects(v)}\" . " if v
-        end
-      end
-
-      return if deletes.empty? and inserts.empty?
-
-      query = ""
-
-      query += "DELETE { #{deletes.join("\n")} }\n" unless deletes.empty?
-
-      query += "INSERT { #{inserts.join("\n")} }\n" unless inserts.empty?
-
-      query += "WHERE { }"
-
-      query
-
-    end
-
-    def escape_sparql_objects v
-      case v
-      when TrueClass, FalseClass
-        v.to_s
-      else
-
-      RDF::NTriples::Writer.escape(v)
-      end
-
     end
   end
 end

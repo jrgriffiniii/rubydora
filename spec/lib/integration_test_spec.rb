@@ -3,7 +3,7 @@ require 'spec_helper'
 
 # These tests require a fedora repository with the resource index enabled (and with syncUpdates = true)
 describe "Integration testing against a live Fedora repository", :integration => true do
-  REPOSITORY_CONFIG = { :url => "http://localhost:#{ENV['TEST_JETTY_PORT'] || 8080}/rest", :user => 'fedoraAdmin', :password => 'fedoraAdmin' }
+  REPOSITORY_CONFIG = { :url => "http://localhost:#{ENV['TEST_JETTY_PORT'] || 8080}", :user => 'fedoraAdmin', :password => 'fedoraAdmin' }
   before(:all) do
     @repository = Rubydora.connect REPOSITORY_CONFIG
     @repository.find('test:1').delete rescue nil
@@ -23,7 +23,7 @@ describe "Integration testing against a live Fedora repository", :integration =>
   it "should create new objects with a given pid" do
     pid = @repository.ingest :pid => 'test:1'
 
-    pid.should == '/test:1'
+    pid.should == 'test:1'
 
     obj = @repository.find(pid)
     obj.should_not be_new
@@ -244,7 +244,7 @@ describe "Integration testing against a live Fedora repository", :integration =>
        obj.datastreams.keys.should_not include('datsatream_to_create')
        obj.datastreams.keys.should include('datastream_to_delete')
        obj.datastreams['datastream_to_change'].content.should == 'asdf'
-       obj.datastreams['datastream_to_change_properties'].versionable.should == true
+       obj.datastreams['datastream_to_change_properties'].should be_versionable
        obj.datastreams['datastream_to_change_properties'].dsState.should include 'I'
     end
 

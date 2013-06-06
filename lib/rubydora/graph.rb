@@ -55,6 +55,10 @@ module Rubydora
       find(map_keyword_to_term(term_or_keyword)).length > 0
     end
 
+    def empty?
+      rdf.empty?
+    end
+
     def map_keyword_to_term term_or_keyword
       term = term_or_keyword if term_or_keyword.is_a? RDF::Term
       term ||= mapping[term_or_keyword]

@@ -358,8 +358,8 @@ describe Rubydora::DigitalObject do
 
       it "should fall-back to the set of default attributes" do
         @mock_repository.should_receive(:object).with(:pid=>"pid").and_raise(RestClient::ResourceNotFound)
-        Rubydora::DigitalObject::OBJ_DEFAULT_ATTRIBUTES.should_receive(:[]).with(:state) { 'zxcv'} 
-        subject.state.should == 'zxcv'
+        subject.stub(:default_attributes => {:state => 'zxcv'})
+        subject.state.should include 'zxcv'
       end
     end
 
@@ -384,7 +384,8 @@ describe Rubydora::DigitalObject do
       end
 
       it "should appear in the save request" do 
-        @mock_repository.should_receive(:ingest).with(hash_including(:state => 'A'))
+        @mock_repository.should_receive(:ingest).with(hash_including(:pid => 'pid'))
+        @mock_repository.should_receive(:modify_object).with(hash_including({:pid=>"pid", :query=>"DELETE { <http://repository/pid> <info:fedora3/state> \"A\" .  }\nINSERT { <http://repository/pid> <info:fedora3/state> \"A\" .  }\nWHERE { }"}))
         @mock_repository.should_receive(:object).with(:pid=>"pid").and_raise(RestClient::ResourceNotFound)
         subject.state='A'
         subject.save

@@ -51,10 +51,15 @@ module Rubydora
       :label => "http://purl.org/dc/terms/title", 
       :logMessage => nil, 
       :createdDate => "info:fedora/fedora-system:def/internal#created",
+      :objCreateDate => "info:fedora/fedora-system:def/internal#created",
       :lastModifiedDate => "info:fedora/fedora-system:def/internal#lastModified",
+      :objLastModDate => "info:fedora/fedora-system:def/internal#lastModified",
+  
       :datastreams => "info:fedora/fedora-system:def/internal#hasChild",
       :models => 'info:fedora/fedora-system:def/internal#mixinTypes'
     })
+
+    OBJ_DEFAULT_ATTRIBUTES = {:state => "A"}
 
 
     define_attribute_methods OBJ_ATTRIBUTES.keys
@@ -69,46 +74,6 @@ module Rubydora
         return attribute_setter("#{attribute}", val)
       end
       RUBY
-    end
-
-    def attribute_reader attribute_name, profile_field = nil
-      return instance_variable_get("@" + attribute_name) if instance_variable_defined? "@" + attribute_name
-
-      val = profile[profile_field]
-
-      if val.is_a? Array
-        obj = self
-        arr = ArrayWithCallback.new val
-        arr.on_change << lambda { |arr, diff| obj.multivalued_attribute_will_change! attribute_name, diff }
-        arr
-      else
-        val
-      end
-    end
-
-    def attribute_setter attribute_name, val
-      current_value = send(attribute_name)
-
-      if current_value.nil? && val.nil?
-        return
-      end
-
-      if val == current_value 
-      elsif current_value.kind_of?(Array) && current_value.length == 1 && val == current_value.first
-
-      else 
-        send(attribute_name + "_will_change!")
-      end
-        
-      if val.is_a? Array
-        obj = self
-        arr = ArrayWithCallback.new val
-        arr.on_change << lambda { |arr, diff| obj.multivalued_attribute_will_change! attribute_name, diff }
-        instance_variable_set("@" + attribute_name, arr)
-      else
-        instance_variable_set("@" + attribute_name, val)
-      end
-
     end
 
     def state= val
@@ -314,6 +279,15 @@ module Rubydora
       @repository ||= Rubydora.repository
     end
 
+    def self.default_attributes
+      OBJ_DEFAULT_ATTRIBUTES
+    end
+
+    def self.attributes
+      OBJ_ATTRIBUTES
+    end
+
+
     protected
     # set the pid of the object
     # @param [String] pid
@@ -322,88 +296,12 @@ module Rubydora
       @pid = pid.gsub('info:fedora/', '') if pid
     end
 
-    def serialize_changes_to_sparql_update
-      deletes = []
-      inserts = []
-
-      changes.map do |k, (old_value, new_value)|
-        Array(old_value).each do |v|
-          if v.is_a? Rubydora::Node
-            v = v.uri
-          end
-
-          deletes << "<#{uri}> <#{OBJ_ATTRIBUTES[k.to_sym].to_s}> \"#{RDF::NTriples::Writer.escape(v)}\" . " if v
-        end
-        Array(new_value).each do |v|
-          if v.is_a? Rubydora::Node
-            v = v.uri
-          end
-          inserts << "<#{uri}> <#{OBJ_ATTRIBUTES[k.to_sym].to_s}> \"#{RDF::NTriples::Writer.escape(v)}\" . " if v
-        end
-      end
-
-      changed_multivalued_attributes.map do |k, diff|
-        diff[:-].each do |v|     
-          if v.is_a? Rubydora::Node
-            v = v.uri
-          end  
-          deletes << "<#{uri}> <#{OBJ_ATTRIBUTES[k.to_sym].to_s}> \"#{RDF::NTriples::Writer.escape(v)}\" . " if v
-        end
-        diff[:+].each do |v|    
-          if v.is_a? Rubydora::Node
-            v = v.uri
-          end   
-          inserts << "<#{uri}> <#{OBJ_ATTRIBUTES[k.to_sym].to_s}> \"#{RDF::NTriples::Writer.escape(v)}\" . " if v
-        end
-      end
-
-      if deletes.empty? and inserts.empty?
-        return
-      end
-
-      query = ""
-
-      query += "DELETE { #{deletes.join("\n")} }\n" unless deletes.empty?
-
-      query += "INSERT { #{inserts.join("\n")} }\n" unless inserts.empty?
-
-      query += "WHERE { }"
-
-      query
-
-    end
-
     # instantiate a datastream object for a dsid
     # @param [String] dsid
     # @return [Datastream]
     def datastream_object_for dsid, options = {}
       options[:asOfDateTime] ||= asOfDateTime if asOfDateTime
       Datastream.new self, dsid, options
-    end
-
-    def check_if_read_only
-      raise "Can't change values on older versions" if @asOfDateTime
-    end
-
-    def multivalued_attribute_will_change! attribute_name, diff = {}
-      check_if_read_only
-      was = changed_multivalued_attributes[attribute_name] ||= {:- => [], :+ => []}
-
-
-      was[:-] = (was[:-] - diff[:+]) + (diff[:-])
-      was[:+] = (was[:+] - diff[:-]) + (diff[:+])
-
-      changed_multivalued_attributes[attribute_name] = was
-    end
-
-    private
-    def changed_multivalued_attributes
-      @changed_multivalued_attributes ||= {}
-    end
-
-    def attribute_will_change! *args
-      check_if_read_only
-      super
     end
 
   end
