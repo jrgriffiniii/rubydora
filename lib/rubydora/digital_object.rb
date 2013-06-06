@@ -213,7 +213,7 @@ module Rubydora
         Array(profile[:datastreams]).map do |datastream|
           # TODO : this is completely wrong! 
           dsid = datastream.split("/").last
-          h[dsid] = datastream_object_for dsid 
+          h[dsid] = datastream_object_for dsid, :profile => profile.with_subject(datastream)
         end               
 
         h

@@ -26,6 +26,7 @@ describe Rubydora::DigitalObject do
     end
 
     it "should be frozen (to prevent modification)" do
+      pending "AF mutates the datastream profile :/"
       @mock_repository.should_receive(:object).with(:pid => 'pid').and_return("
         <http://repository/pid> <info:fedora/fedora-system:def/internal#createdby> \"<anonymous>\" .
 ")
@@ -129,6 +130,16 @@ describe Rubydora::DigitalObject do
         end
 
         object.datastreams['asdf'].should be_a_kind_of(MyCustomDatastreamClass)
+      end
+
+      it "should load initial datastream profile data from information in the object graph" do
+        @mock_repository.should_not_receive(:datastream)
+
+        @object.stub(:profile_data => "<http://repository/pid> <info:fedora/fedora-system:def/internal#hasChild> <http://repository/pid/a> .
+        <http://repository/pid/a> <http://purl.org/dc/terms/title> \"xyz\"")
+
+
+        @object.datastreams['a'].label.should include "xyz"
       end
       
     end

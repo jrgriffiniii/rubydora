@@ -113,6 +113,10 @@ module Rubydora
         @digital_object = digital_object
         @dsid = dsid
         @options = options
+        if options[:profile]
+          @profile = options[:profile]
+          @profile_data = true
+        end
         @default_attributes = default_attributes.merge(default_instance_attributes)
         options.each do |key, value|
           self.send(:"#{key}=", value)
