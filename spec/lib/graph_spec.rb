@@ -32,4 +32,9 @@ describe Rubydora::Graph do
   it "should map keywords to RDF terms" do
     subject[:uuid].first.should == "bf55d19a-f0da-4486-a2a2-2c5ed0de1a79"
   end
+
+  it "should allow setters" do
+    subject['some-predicate'] = "abc"
+    subject['some-predicate'].should include "abc"
+  end
 end

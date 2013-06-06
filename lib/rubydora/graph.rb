@@ -51,6 +51,18 @@ module Rubydora
       find map_keyword_to_term(term_or_keyword)
     end
 
+    def []= term_or_keyword, val
+      term = map_keyword_to_term(term_or_keyword)
+      enum = rdf.query([subject, term, nil])
+
+      enum.map { |x| rdf.delete x }
+
+      Array(val).each do |v|
+        rdf << RDF::Statement.new(:subject => subject, :predicate => term, :object => v)
+      end
+
+    end
+
     def has_key? term_or_keyword
       find(map_keyword_to_term(term_or_keyword)).length > 0
     end
