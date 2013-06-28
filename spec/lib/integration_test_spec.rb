@@ -1,19 +1,17 @@
 require 'spec_helper'
-
+gem 'net-http-spy'
+require 'net-http-spy'
+Net::HTTP.http_logger_options = {:verbose => true}
 
 # These tests require a fedora repository with the resource index enabled (and with syncUpdates = true)
 describe "Integration testing against a live Fedora repository", :integration => true do
-  REPOSITORY_CONFIG = { :url => "http://localhost:#{ENV['TEST_JETTY_PORT'] || 8080}", :user => 'fedoraAdmin', :password => 'fedoraAdmin' }
+  REPOSITORY_CONFIG = { :url => "http://localhost:#{ENV['TEST_JETTY_PORT'] || 8080}/rest", :user => 'fedoraAdmin', :password => 'fedoraAdmin' }
   before(:all) do
-    @repository = Rubydora.connect REPOSITORY_CONFIG
-    @repository.find('test:1').delete rescue nil
-    @repository.find('test:2').delete rescue nil
-    @repository.find('test:3').delete rescue nil
+    @repository = Rubydora.connect(REPOSITORY_CONFIG).within_transaction
   end
 
   after(:all) do
-  #  @repository.find('test:1').delete rescue nil
-  #  @repository.find('test:2').delete rescue nil
+    @repository.rollback
   end
 
   it "should connect" do

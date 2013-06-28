@@ -113,6 +113,38 @@ module Rubydora
       true
     end
 
+    def within_transaction txid = nil, &block
+      new_base_url = if txid.nil?
+        create_transaction
+      else
+        base_url + "/" + txid
+      end
+
+      txrepo = Rubydora::Repository.new(@config.merge(:url => new_base_url))
+      if block_given?
+        block.call(txrepo)
+        txrepo.commit! if txid.nil? and txrepo.tx_alive?
+      else
+        return txrepo
+      end
+    end
+    alias_method :transaction, :within_transaction
+
+    def commit!
+      @tx_alive = false
+      commit
+    end
+
+    def rollback!
+      @tx_alive = false
+      rollback
+    end
+
+    def tx_alive?
+      @tx_alive.nil? || @tx_alive
+    end
+
+
     protected
 
     # Load fallback API implementations for older versions of Fedora

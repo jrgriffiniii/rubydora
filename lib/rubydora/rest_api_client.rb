@@ -37,7 +37,6 @@ module Rubydora
       end
 
       define_hook :after_ingest
-      include Transactions
     end
 
     # Create an authorized HTTP client for the Fedora REST API
@@ -479,6 +478,28 @@ module Rubydora
     rescue Exception => exception
         rescue_with_handler(exception) || raise
 
+    end
+
+    def create_transaction
+      response = client[new_transaction_url].post nil
+      response.headers[:location]
+    rescue Exception => exception
+        rescue_with_handler(exception) || raise
+
+    end
+
+    def commit
+      client[commit_url].post nil
+
+    rescue Exception => exception
+        rescue_with_handler(exception) || raise
+    end
+
+    def rollback
+      client[rollback_url].post nil
+
+    rescue Exception => exception
+        rescue_with_handler(exception) || raise
     end
     
     def safe_subresource(subresource, options=Hash.new)

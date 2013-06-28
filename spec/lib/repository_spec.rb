@@ -82,4 +82,36 @@ describe Rubydora::Repository do
     end
   end
 
+  describe "transactions" do
+      subject { Rubydora::Repository.new :url => 'http://localhost/fcrepo' }
+
+    describe "within anonymous transaction" do
+      it "should create a transaction, run a block, and commit" do
+        subject.should_receive(:create_transaction).and_return("http://localhost/fcrepo/tx:123")
+
+        subject.within_transaction do |r|
+          r.should_receive(:commit)
+          r.base_url.should == "http://localhost/fcrepo/tx:123"
+        end
+      end
+    end
+
+    describe "named transaction" do
+      it "should scope requests to the given transaction" do
+        r = subject.within_transaction("tx:456")
+        r.base_url.should == "http://localhost/fcrepo/tx:456"
+
+      end
+
+      it "should not commit a named transaction automatically" do
+
+        subject.within_transaction("tx:456") do |r|
+          r.should_not_receive(:commit)
+          r.base_url.should == "http://localhost/fcrepo/tx:456"
+        end
+      end
+
+    end
+  end
+
 end

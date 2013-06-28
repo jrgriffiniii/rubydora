@@ -139,5 +139,18 @@ module Rubydora
     def new_object_relationship_url pid, options = nil
       url_for(object_relationship_url(pid) + "/new", options)
     end
+
+    def new_transaction_url
+       url_for("fcr:tx")
+    end
+
+    def commit_url
+       url_for("fcr:tx/fcr:commit")
+    end
+
+    def rollback_url
+       url_for("fcr:tx/fcr:rollback")
+    end
+
   end
 end
