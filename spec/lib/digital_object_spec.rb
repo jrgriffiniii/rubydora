@@ -482,4 +482,9 @@ describe Rubydora::DigitalObject do
     it_behaves_like "an object attribute"
     let(:method) { 'lastModifiedDate' }
   end
+
+  describe "#createdDate" do
+    it_behaves_like "an object attribute"
+    let(:method) { 'createdDate' }
+  end
 end
